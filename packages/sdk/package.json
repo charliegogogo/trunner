@@ -1,0 +1,43 @@
+{
+  "name": "@trunner/sdk",
+  "version": "0.1.0",
+  "description": "Core SDK for trunner: Tool abstraction, runner, installer, and Terraform implementation.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:unit": "vitest run --dir test/unit",
+    "test:integration": "vitest run --dir test/integration",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint: not yet configured'",
+    "clean": "rm -rf dist coverage .tsbuildinfo"
+  },
+  "dependencies": {
+    "@cdktf/hcl2json": "latest",
+    "tar": "7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.0",
+    "@types/tar": "6.1.13",
+    "tsup": "8.3.5",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}
