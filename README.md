@@ -30,8 +30,6 @@ See [`plan.md`](./plan.md) for the full plan.
 | **Node.js** | `26.1.0` (exact) | pinned in `.nvmrc` and root `engines.node` |
 | **pnpm** | `11.5.0` | enforced via root `packageManager` |
 
-No system binaries are required at runtime — `.zip` and `.tar.gz` archives are extracted in-process by `adm-zip` and `tar` respectively.
-
 For development commands, the test suite, the `esbuild` post-install quirk, integration-test env vars, and everything else an agent or contributor needs on day one, see **[`AGENTS.md`](./AGENTS.md)** — it is the single source of truth for "how to work in this repo."
 
 ---
