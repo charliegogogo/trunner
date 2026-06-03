@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process';
 import { promises as fsp, createReadStream, createWriteStream } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip } from 'node:zlib';
+import AdmZip from 'adm-zip';
 import * as tar from 'tar';
 import { ensureDir, removeIfExists } from '../utils/fs.js';
 import type { PlatformInfo } from '../utils/os.js';
@@ -26,9 +26,9 @@ export interface ExtractOptions {
  * Extract a `.zip` or `.tar.gz` archive into `destDir`.
  * Returns all extracted file paths and the absolute path of the detected binary.
  *
- * `tar.gz` is handled in-process via the `tar` package. `.zip` is delegated to
- * the system `unzip` binary (available on macOS / Linux out of the box and
- * shipped with Git for Windows) for cross-platform reliability.
+ * Both formats are handled in-process:
+ * - `tar.gz` via the `tar` package.
+ * - `.zip` via the `adm-zip` package (pure-JS, no system binary dependency).
  */
 export async function extractArchive(opts: ExtractOptions): Promise<ExtractResult> {
   const { archivePath, destDir, binaryMarker } = opts;
@@ -70,55 +70,39 @@ async function extractTarGz(archivePath: string, destDir: string, binaryMarker: 
 }
 
 /**
- * Use the system `unzip` to extract the archive, then locate the marked binary.
- * Relies on `unzip` being on PATH (true on macOS / Linux; for Windows we
- * recommend Git for Windows, which provides it).
+ * Extract a `.zip` archive using `adm-zip` (pure-JS).
+ *
+ * Files are written via `fs.writeFile`, which means POSIX permission bits
+ * stored in the zip are not preserved by the OS write — we re-apply `chmod`
+ * using the external file attributes recorded in the zip header
+ * (`entry.attr >> 16`). Anything matching `binaryMarker` is force-set to
+ * `0o755` so it is executable on POSIX systems.
  */
 async function extractZip(archivePath: string, destDir: string, binaryMarker: string): Promise<ExtractResult> {
-  await runProcess('unzip', ['-o', '-q', archivePath, '-d', destDir]);
-
-  // Walk the extracted tree to find the marked binary and collect file names.
+  const zip = new AdmZip(archivePath);
   const files: string[] = [];
   let binaryPath: string | undefined;
-  await walkDir(destDir, (entryPath) => {
-    const rel = entryPath.slice(destDir.length + 1);
-    files.push(rel.split(/[\\/]/).join('/'));
-    if (!binaryPath && entryPath.includes(binaryMarker)) {
-      binaryPath = entryPath;
-    }
-  });
-  return { files, binaryPath };
-}
 
-function runProcess(cmd: string, args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    child.stderr.on('data', (d) => {
-      stderr += d.toString('utf-8');
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${cmd} exited with code ${code}: ${stderr}`));
-    });
-  });
-}
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue;
 
-async function walkDir(root: string, visit: (absPath: string) => void | Promise<void>): Promise<void> {
-  const stack: string[] = [root];
-  while (stack.length > 0) {
-    const dir = stack.pop()!;
-    const entries = await fsp.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(full);
-      } else if (entry.isFile()) {
-        await visit(full);
-      }
+    const relPath = entry.entryName.split(/[\\/]/).join('/');
+    const target = join(destDir, relPath);
+    await ensureDir(dirname(target));
+    await fsp.writeFile(target, entry.getData());
+
+    const zipMode = (entry.attr >>> 16) & 0o777;
+    if (relPath.includes(binaryMarker)) {
+      binaryPath = target;
+      await fsp.chmod(target, 0o755);
+    } else if (zipMode && process.platform !== 'win32') {
+      await fsp.chmod(target, zipMode);
     }
+
+    files.push(relPath);
   }
+
+  return { files, binaryPath };
 }
 
 /**

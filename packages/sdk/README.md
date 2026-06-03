@@ -87,4 +87,7 @@ The integration test downloads a real Terraform binary (set `TRUNNER_TERRAFORM_V
 
 ## Notes on archive extraction
 
-`tar.gz` is handled in-process via the [`tar`](https://www.npmjs.com/package/tar) package. `.zip` extraction is delegated to the system `unzip` binary (present on macOS and Linux out of the box, and shipped with Git for Windows). This is a deliberate trade-off: it avoids known issues with pure-JS zip libraries on some platforms and yields identical output to what users get when running `terraform` from the official HashiCorp archive.
+Both formats are handled fully in-process — no system binaries required:
+
+- `.tar.gz` is extracted by the [`tar`](https://www.npmjs.com/package/tar) package.
+- `.zip` is extracted by [`adm-zip`](https://www.npmjs.com/package/adm-zip), a pure-JS implementation that reads the zip headers and writes entries through `fs.writeFile`. POSIX permission bits are reapplied from the zip's external file attributes (`entry.attr >> 16`); any extracted file whose path matches the `binaryMarker` is force-set to `0o755` so it is executable.

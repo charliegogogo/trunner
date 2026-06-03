@@ -31,9 +31,11 @@
   },
   "dependencies": {
     "@cdktf/hcl2json": "latest",
+    "adm-zip": "0.5.16",
     "tar": "7.4.3"
   },
   "devDependencies": {
+    "@types/adm-zip": "0.5.7",
     "@types/node": "22.10.0",
     "@types/tar": "6.1.13",
     "tsup": "8.3.5",

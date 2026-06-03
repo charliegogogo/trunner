@@ -70,9 +70,8 @@ trunner/
 | --- | --- | --- |
 | **Node.js** | `26.1.0` (exact) | `.nvmrc`, root `engines.node`, root `packageManager` |
 | **pnpm** | `>=10` (root declares `pnpm@11.5.0`) | root `engines.pnpm`, `packageManager` |
-| **unzip** (system) | any recent | required at runtime on macOS/Linux; ships with Git for Windows |
 
-The system `unzip` binary is used for extracting `.zip` archives (HashiCorp ships Terraform as `.zip` for all platforms). On macOS and Linux it is available out of the box; on Windows the integration tests rely on the `unzip` shipped with Git for Windows.
+No system binaries are required at runtime — `.zip` archives (HashiCorp ships Terraform as `.zip` for all platforms) are extracted in-process by the pure-JS [`adm-zip`](https://www.npmjs.com/package/adm-zip) library, and `.tar.gz` archives by the [`tar`](https://www.npmjs.com/package/tar) package.
 
 ---
 
@@ -190,7 +189,7 @@ The integration test populates and cleans up its own fixture project; it does **
 | `packages/sdk/src/types/` | Public interfaces: `Tool`, `CommandSpec`, `RunnerEventMap`, `ProgressInfo`, `VersionInfo`, provider types |
 | `packages/sdk/src/utils/` | `logger` (Console/Noop with child bindings), `fs` (atomic write, JSON helpers), `os` (platform/arch detection) |
 | `packages/sdk/src/env/` | `paths.ts` (cross-platform `~/.trunner/...`), `config.ts` (persistent `TrunnerConfig`) |
-| `packages/sdk/src/installer/` | `checksum` (SHA-256), `downloader` (fetch + retries + progress + abort), `extractor` (`.tar.gz` via `tar`, `.zip` via system `unzip`) |
+| `packages/sdk/src/installer/` | `checksum` (SHA-256), `downloader` (fetch + retries + progress + abort), `extractor` (`.tar.gz` via `tar`, `.zip` via `adm-zip`) |
 | `packages/sdk/src/tools/base/` | `BaseTool`, `BaseBinaryManager`, `BaseProviderManager` |
 | `packages/sdk/src/tools/terraform/` | Concrete Terraform implementation: release source, binary, provider, command registry |
 | `packages/sdk/src/runner/` | `RunnerStream` (EventEmitter), `executor` (spawn + AbortSignal + prompt detection), `parser` (plan/apply/destroy summaries) |
