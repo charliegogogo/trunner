@@ -19,7 +19,7 @@ The POC targets **Terraform only**; the architecture is designed so OpenTofu and
 | **Phase 3B** | Desktop features (real SDK wiring + cross-platform installers) | ⏳ Planned |
 | **Phase 5** | OpenTofu & Terragrunt implementations | ⏳ Post-POC |
 
-See [`plan.md`](./plan.md) for the full plan.
+See [`PLAN.md`](./PLAN.md) for the full plan.
 
 ---
 
@@ -57,7 +57,7 @@ trunner/
 ├── package.json               # Root scripts (recursive build/test/lint/typecheck/clean)
 ├── .nvmrc                     # Pinned Node version (26.1.0)
 ├── .npmrc                     # pnpm settings
-├── plan.md                    # Full implementation plan
+├── PLAN.md                    # Full implementation plan
 ├── README.md                  # This file
 ├── AGENTS.md                  # Dev/test/build cheatsheet + gotchas (single source of truth)
 └── packages/
@@ -98,7 +98,7 @@ trunner/
                                     config,logs,tmp}
 ```
 
-The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu or Terragrunt is a single folder under `packages/sdk/src/tools/<name>/` plus one line in the registry — no CLI/Desktop changes. See [plan.md §8](./plan.md) for the full extensibility plan.
+The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu or Terragrunt is a single folder under `packages/sdk/src/tools/<name>/` plus one line in the registry — no CLI/Desktop changes. See [PLAN.md §8](./PLAN.md) for the full extensibility plan.
 
 ---
 
@@ -110,13 +110,13 @@ The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu
 - **M4** ⏳ Phase 3B — Production-grade Desktop app for Terraform workflows on macOS / Linux / Windows
 - **M5** ⏳ Post-POC — OpenTofu & Terragrunt on the same `Tool` abstraction
 
-Tracked in detail in [`plan.md`](./plan.md) sections 7–11.
+Tracked in detail in [`PLAN.md`](./PLAN.md) sections 7–11.
 
 ---
 
 ## Documentation
 
-- [`plan.md`](./plan.md) — full implementation plan, phase breakdown, technical decisions, risks
+- [`PLAN.md`](./PLAN.md) — full implementation plan, phase breakdown, technical decisions, risks
 - [`AGENTS.md`](./AGENTS.md) — **dev/test/build cheatsheet and gotchas (read this first)**
 - [`packages/sdk/README.md`](./packages/sdk/README.md) — SDK API overview and quick-start
 

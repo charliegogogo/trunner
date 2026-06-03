@@ -4,7 +4,7 @@ Repo-specific guidance for AI agents working in `trunner`. Skim this before touc
 
 ## What this repo is
 
-pnpm + TypeScript monorepo. POC scope is **Terraform only** — OpenTofu and Terragrunt are placeholders for a later phase. The `master plan` is in [`plan.md`](./plan.md); the full phase breakdown (Phases 1 → 5) is in §7 of that file.
+pnpm + TypeScript monorepo. POC scope is **Terraform only** — OpenTofu and Terragrunt are placeholders for a later phase. The `master plan` is in [`PLAN.md`](./PLAN.md); the full phase breakdown (Phases 1 → 5) is in §7 of that file.
 
 Currently only `@trunner/sdk` is implemented (Phase 1 ✅, 54/54 tests pass). `packages/cli` and `packages/desktop` are not created yet.
 
@@ -16,7 +16,7 @@ trunner/
 ├── tsconfig.base.json           # strict + noUncheckedIndexedAccess + noImplicitOverride
 ├── package.json                 # recursive root scripts (pnpm -r …)
 ├── .nvmrc                       # 26.1.0 (exact)
-├── plan.md
+├── PLAN.md
 ├── README.md
 └── packages/
     └── sdk/                     # the only workspace package so far
@@ -130,7 +130,7 @@ Everything the SDK exports comes from `packages/sdk/src/index.ts`. New types and
 
 ### 8. No CI yet
 
-`.github/workflows/` does not exist, even though `plan.md` §9 mentions a CI matrix. If you're asked to add CI, build it from scratch (macos-latest + ubuntu-latest + windows-latest, all pinned to Node 26.1.0).
+`.github/workflows/` does not exist, even though `PLAN.md` §9 mentions a CI matrix. If you're asked to add CI, build it from scratch (macos-latest + ubuntu-latest + windows-latest, all pinned to Node 26.1.0).
 
 ## Test command order for a clean PR
 
@@ -156,6 +156,6 @@ See `packages/sdk/src/tools/terraform/` for the reference implementation.
 
 ## References
 
-- [`plan.md`](./plan.md) — full implementation plan, risks, milestones
+- [`PLAN.md`](./PLAN.md) — full implementation plan, risks, milestones
 - [`README.md`](./README.md) — onboarding commands, dev/test/build cheatsheet
 - [`packages/sdk/README.md`](./packages/sdk/README.md) — SDK API usage examples
