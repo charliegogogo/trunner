@@ -356,33 +356,33 @@ Each phase ends with passing tests and a working demo.
 
 **Goal**: A publishable, tested `@trunner/sdk` that can download a Terraform binary, install providers, and execute commands via an EventEmitter-based runner.
 
-- [ ] Initialize monorepo root: `pnpm-workspace.yaml`, `tsconfig.base.json`, `.npmrc`, root `package.json`, `.gitignore`, `.editorconfig`, `.nvmrc`.
-- [ ] Add root scripts: `build`, `dev`, `test`, `test:integration`, `lint`, `typecheck`, `clean`.
-- [ ] Configure pnpm workspace and shared TS settings (strict, `target: ES2022`, `moduleResolution: Bundler`).
-- [ ] Bootstrap `packages/sdk` with `package.json`, `tsup.config.ts`, `tsconfig.json`, `vitest.config.ts`.
-- [ ] Implement `types/`: `tool.ts`, `command.ts`, `result.ts`, `events.ts`, `provider.ts`.
-- [ ] Implement `utils/`: `logger.ts`, `fs.ts`, `os.ts`.
-- [ ] Implement `env/paths.ts` (cross-platform `~/.trunner/{binaries,providers,config}`).
-- [ ] Implement `env/config.ts` (persistent JSON state: active tool, versions, mirror).
-- [ ] Implement `installer/checksum.ts` (SHA256 verification).
-- [ ] Implement `installer/extractor.ts` (zip + tar.gz per platform).
-- [ ] Implement `installer/downloader.ts` (fetch + retries + progress).
-- [ ] Implement `tools/base/base-tool.ts`, `base-binary-manager.ts`, `base-provider-manager.ts`.
-- [ ] Implement `tools/terraform/release-source.ts` (releases.hashicorp.com).
-- [ ] Implement `tools/terraform/binary.ts` (download/extract/cache/version-pinning).
-- [ ] Implement `tools/terraform/provider.ts` (HCL parsing via `@cdktf/hcl2json`, registry fetch, filesystem mirror).
-- [ ] Implement `tools/terraform/commands.ts` (init/plan/apply/destroy/validate/output/fmt with argSpec/envSpec).
-- [ ] Implement `runner/executor.ts` (spawn, env injection, AbortSignal).
-- [ ] Implement `runner/stream.ts` (EventEmitter, stdout/stderr/progress/prompt/exit).
-- [ ] Implement `runner/parser.ts` (plan/apply output parsing — changes, errors, summaries).
-- [ ] Implement `registry/tool-registry.ts` with `register('terraform', ...)`.
-- [ ] Implement `src/index.ts` public API exports.
-- [ ] Unit tests: types, paths, checksum, extractor, HCL parsing (fixture-based).
-- [ ] Unit tests: executor with mocked `child_process` (event order, env injection, cancellation).
-- [ ] Integration tests: download Terraform to a tmp dir and run `init` → `plan` → `apply` → `destroy` on a minimal fixture.
-- [ ] Verify `pnpm -F @trunner/sdk build` produces ESM + CJS + `.d.ts`.
+- [x] Initialize monorepo root: `pnpm-workspace.yaml`, `tsconfig.base.json`, `.npmrc`, root `package.json`, `.gitignore`, `.editorconfig`, `.nvmrc`.
+- [x] Add root scripts: `build`, `dev`, `test`, `test:integration`, `lint`, `typecheck`, `clean`.
+- [x] Configure pnpm workspace and shared TS settings (strict, `target: ES2022`, `moduleResolution: Bundler`).
+- [x] Bootstrap `packages/sdk` with `package.json`, `tsup.config.ts`, `tsconfig.json`, `vitest.config.ts`.
+- [x] Implement `types/`: `tool.ts`, `command.ts`, `result.ts`, `events.ts`, `provider.ts`.
+- [x] Implement `utils/`: `logger.ts`, `fs.ts`, `os.ts`.
+- [x] Implement `env/paths.ts` (cross-platform `~/.trunner/{binaries,providers,config}`).
+- [x] Implement `env/config.ts` (persistent JSON state: active tool, versions, mirror).
+- [x] Implement `installer/checksum.ts` (SHA256 verification).
+- [x] Implement `installer/extractor.ts` (zip + tar.gz per platform).
+- [x] Implement `installer/downloader.ts` (fetch + retries + progress).
+- [x] Implement `tools/base/base-tool.ts`, `base-binary-manager.ts`, `base-provider-manager.ts`.
+- [x] Implement `tools/terraform/release-source.ts` (releases.hashicorp.com).
+- [x] Implement `tools/terraform/binary.ts` (download/extract/cache/version-pinning).
+- [x] Implement `tools/terraform/provider.ts` (HCL parsing via `@cdktf/hcl2json`, registry fetch, filesystem mirror).
+- [x] Implement `tools/terraform/commands.ts` (init/plan/apply/destroy/validate/output/fmt with argSpec/envSpec).
+- [x] Implement `runner/executor.ts` (spawn, env injection, AbortSignal).
+- [x] Implement `runner/stream.ts` (EventEmitter, stdout/stderr/progress/prompt/exit).
+- [x] Implement `runner/parser.ts` (plan/apply output parsing — changes, errors, summaries).
+- [x] Implement `registry/tool-registry.ts` with `register('terraform', ...)`.
+- [x] Implement `src/index.ts` public API exports.
+- [x] Unit tests: types, paths, checksum, extractor, HCL parsing (fixture-based).
+- [x] Unit tests: executor with mocked `child_process` (event order, env injection, cancellation).
+- [x] Integration tests: download Terraform to a tmp dir and run `init` → `plan` → `apply` → `destroy` on a minimal fixture.
+- [x] Verify `pnpm -F @trunner/sdk build` produces ESM + CJS + `.d.ts`.
 
-**Phase 1 acceptance**: `packages/sdk/test/integration` completes a full `init/plan/apply/destroy` cycle against a real Terraform binary.
+**Phase 1 acceptance**: ✅ `packages/sdk/test/integration` completes a full `init/plan/apply/destroy` cycle against a real Terraform binary (53/53 tests pass, ~2.3s).
 
 ---
 
