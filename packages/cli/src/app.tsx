@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Text, useInput, useStdin } from 'ink';
+import React, { useEffect, useState } from 'react';
+import { Box, Text, useApp, useInput, useStdin } from 'ink';
+import { stat } from 'node:fs/promises';
+import { resolve as resolvePath } from 'node:path';
 import {
   discoverWorkspaces,
+  parseRc,
+  rcPathFor,
   runWorkspaces,
   type Workspace,
   type WorkspaceEvent,
@@ -35,6 +39,7 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
     summary: null,
   });
   const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
+  const ink = useApp();
   const { workspaces, focusedIndex, moveFocus, answerFocusedPrompt, summary } = useWorkspaces(
     iter,
     {
@@ -51,10 +56,29 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
         const ws = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
         if (cancelled) return;
         if (ws.length === 0) {
+          // If the immediate cwd has a .trunnerrc that failed to parse,
+          // discover() silently skipped it (project boundary semantic).
+          // Surface the parse error so the user knows why their RC was ignored.
+          const cwdAbs = resolvePath(flags.cwd);
+          const cwdRc = rcPathFor(cwdAbs);
+          let parseError: string | null = null;
+          try {
+            const st = await stat(cwdRc);
+            if (st.isFile()) {
+              await parseRc(cwdRc);
+            }
+          } catch (err) {
+            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+              parseError = (err as Error).message;
+            }
+          }
+          const msg = parseError
+            ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
+            : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
           setState({
             phase: 'error',
             workspaces: [],
-            error: `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`,
+            error: msg,
             summary: null,
           });
           return;
@@ -81,6 +105,23 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
       cancelled = true;
     };
   }, [command, commandArgs, flags.cwd, flags.exclude, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+
+  // Exit the Ink tree once a terminal phase (error | done) has rendered.
+  // Without this the process keeps the render loop alive and the user has
+  // to Ctrl+C. process.exitCode is set so the shell sees the right code
+  // after ink.exit's cleanup: 0 for done-with-no-failures, 1 for any
+  // workspace failure or discover error.
+  useEffect(() => {
+    if (state.phase !== 'error' && state.phase !== 'done') return;
+    if (state.phase === 'error') {
+      process.exitCode = 1;
+    } else {
+      const s = summary ?? state.summary;
+      process.exitCode = s && s.failed > 0 ? 1 : 0;
+    }
+    const t = setTimeout(() => ink.exit(), 0);
+    return () => clearTimeout(t);
+  }, [state.phase, state.summary, summary, ink]);
 
   const { isRawModeSupported } = useStdin();
   useInput(
