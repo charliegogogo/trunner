@@ -35,6 +35,10 @@ fi
 
 echo "SEA: using node at $NODE_BIN ($("$NODE_BIN" -v))"
 echo "SEA: building single executable from $SEA_CONFIG"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "$OUT" ]; then
+  echo "SEA: stripping existing signature (macOS)"
+  codesign --remove-signature "$OUT" 2>/dev/null || true
+fi
 node --build-sea "$SEA_CONFIG"
 
 echo "SEA: re-signing (macOS)"
