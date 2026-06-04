@@ -1,10 +1,10 @@
 # trunner
 
-> Cross-platform CLI + Desktop tool for running **OpenTofu** / **Terraform** / **Terragrunt** commands.
+> Cross-platform CLI + Desktop tool for running **OpenTofu** / **Terraform** commands.
 
 `trunner` wraps the official binaries of these IaC tools behind a single, consistent interface — same install, same execution model, same event stream — and ships the CLI as a **single native executable** per platform (via Node.js SEA) so end users don't need to install Node.
 
-The POC targets **Terraform only**; the architecture is designed so OpenTofu and Terragrunt can be added as peer `Tool` implementations without touching the CLI/Desktop surfaces.
+The POC targets **Terraform only**; the architecture is designed so OpenTofu can be added as a peer `Tool` implementation without touching the CLI/Desktop surfaces.
 
 ---
 
@@ -17,7 +17,7 @@ The POC targets **Terraform only**; the architecture is designed so OpenTofu and
 | **Phase 2B** | Desktop UI shell (Electron + Vite + React + Tailwind + Zustand) | ⏳ Planned |
 | **Phase 3A** | CLI features (real SDK wiring + SEA-packaged executables) | ⏳ Planned |
 | **Phase 3B** | Desktop features (real SDK wiring + cross-platform installers) | ⏳ Planned |
-| **Phase 5** | OpenTofu & Terragrunt implementations | ⏳ Post-POC |
+| **Phase 5** | OpenTofu implementation | ⏳ Post-POC |
 
 See [`PLAN.md`](./PLAN.md) for the full plan.
 
@@ -83,8 +83,7 @@ trunner/
                                        ▼
         ┌──────────────────────────────────────────────────────┐
         │                   @trunner/sdk                       │
-        │  Runner  ←→  ToolRegistry  ←→  {Terraform, OpenTofu, │
-        │     │              │              Terragrunt, …}    │
+         │  Runner  ←→  ToolRegistry  ←→  {Terraform, OpenTofu, …} │
         │     │              │                                │
         │  EventEmitter   Binary/Provider                    │
         │  stdout/stderr  Manager                             │
@@ -98,7 +97,7 @@ trunner/
                                     config,logs,tmp}
 ```
 
-The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu or Terragrunt is a single folder under `packages/sdk/src/tools/<name>/` plus one line in the registry — no CLI/Desktop changes. See [PLAN.md §8](./PLAN.md) for the full extensibility plan.
+The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu is a single folder under `packages/sdk/src/tools/<name>/` plus one line in the registry — no CLI/Desktop changes. See [PLAN.md §8](./PLAN.md) for the full extensibility plan.
 
 ---
 
@@ -108,7 +107,7 @@ The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu
 - **M2** ⏳ Phase 2A + 2B — CLI TUI shell and Desktop UI shell both render against a mock runner
 - **M3** ⏳ Phase 3A — Production-grade CLI for Terraform workflows + SEA-packaged executables per platform
 - **M4** ⏳ Phase 3B — Production-grade Desktop app for Terraform workflows on macOS / Linux / Windows
-- **M5** ⏳ Post-POC — OpenTofu & Terragrunt on the same `Tool` abstraction
+- **M5** ⏳ Post-POC — OpenTofu on the same `Tool` abstraction
 
 Tracked in detail in [`PLAN.md`](./PLAN.md) sections 7–11.
 
