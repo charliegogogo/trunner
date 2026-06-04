@@ -30,16 +30,15 @@
     "clean": "rm -rf dist coverage .tsbuildinfo"
   },
   "dependencies": {
-    "@cdktf/hcl2json": "latest",
-    "adm-zip": "0.5.16",
-    "tar": "7.4.3"
+    "@cdktf/hcl2json": "^0.21.0",
+    "adm-zip": "^0.5.17",
+    "tar": "^7.5.11"
   },
   "devDependencies": {
-    "@types/adm-zip": "0.5.7",
-    "@types/node": "22.10.0",
-    "@types/tar": "6.1.13",
-    "tsup": "8.3.5",
-    "typescript": "5.6.3",
-    "vitest": "2.1.8"
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^25.9.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
   }
 }

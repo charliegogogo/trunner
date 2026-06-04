@@ -1,4 +1,8 @@
 packages:
   - "packages/*"
+
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
+
+overrides:
+  vite: "^8.0.0"

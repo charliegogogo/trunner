@@ -17,9 +17,13 @@
     "test:integration": "pnpm -r test:integration",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r exec rm -rf dist coverage .tsbuildinfo && rm -rf node_modules"
+    "clean": "pnpm -r exec rm -rf dist coverage .tsbuildinfo && rm -rf node_modules",
+    "cli:build:sea:macos": "pnpm -F @trunner/cli build:sea:macos",
+    "cli:build:sea:linux": "pnpm -F @trunner/cli build:sea:linux",
+    "cli:build:sea:windows": "pnpm -F @trunner/cli build:sea:windows",
+    "cli:build:sea": "node scripts/cli-build-sea-dispatcher.js"
   },
   "devDependencies": {
-    "typescript": "5.6.3"
+    "typescript": "^6.0.3"
   }
 }

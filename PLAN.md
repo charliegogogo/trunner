@@ -390,21 +390,21 @@ Each phase ends with passing tests and a working demo.
 
 **Goal**: An Ink-based CLI scaffold with reusable components and a mock-runner-driven UI to validate interaction patterns before wiring to the real SDK.
 
-- [ ] Bootstrap `packages/cli` with Ink, meow, `ink-testing-library`, `tsx`.
-- [ ] Configure `tsup.config.ts` for the CLI: CJS single-file bundle, `target: 'node26'`, bundled deps.
-- [ ] Add `sea-config.json` and `scripts/build-sea.{sh,ps1}` for the Node.js SEA pipeline (bundle → blob → `postject` injection).
-- [ ] Add root scripts: `cli:build:sea:macos` / `cli:build:sea:linux` / `cli:build:sea:windows` and a `cli:build:sea` dispatcher.
-- [ ] Implement `bin.tsx` with shebang and meow arg parsing.
-- [ ] Implement `ui/Spinner.tsx`.
-- [ ] Implement `ui/ProgressBar.tsx`.
-- [ ] Implement `ui/Confirm.tsx` (mock `runner.prompt`).
-- [ ] Implement `ui/OutputView.tsx` (ANSI parsing, colorized, streaming).
-- [ ] Implement `hooks/useRunner.ts` (EventEmitter → React state).
-- [ ] Implement `app.tsx` with top-level error boundary.
-- [ ] Component tests with `ink-testing-library` for `OutputView`, `Confirm`, `Spinner`.
-- [ ] Manual smoke: run `trunner` with a mock runner producing stdout/stderr/prompt events.
+- [x] Bootstrap `packages/cli` with Ink, meow, `ink-testing-library`, `tsx`.
+- [x] Configure `tsup.config.ts` for the CLI: ESM single-file bundle (Ink 7 = ESM-only with TLA), `target: 'node26'`, bundled deps.
+- [x] Add `sea-config.json` (`mainFormat: "module"`, `useCodeCache: true`) and `scripts/build-sea.{sh,ps1}` for the Node.js SEA pipeline (`node --build-sea` one-step).
+- [x] Add root scripts: `cli:build:sea:macos` / `cli:build:sea:linux` / `cli:build:sea:windows` and a `cli:build:sea` dispatcher.
+- [x] Implement `trunner.tsx` (renamed from `bin.tsx` to match bundle output) with shebang and meow arg parsing.
+- [x] Implement `ui/Spinner.tsx`.
+- [x] Implement `ui/ProgressBar.tsx`.
+- [x] Implement `ui/Confirm.tsx` (mock `runner.prompt`).
+- [x] Implement `ui/OutputView.tsx` (ANSI stripping, streaming).
+- [x] Implement `hooks/useRunner.ts` (EventEmitter → React state).
+- [x] Implement `app.tsx` with lazy SDK import to avoid eager `@cdktf/hcl2json` WASM load; mock vs real invocation paths.
+- [x] Component tests with `ink-testing-library` for `Spinner`, `ProgressBar`, `MockRunner`.
+- [x] Manual smoke: run `trunner` with a mock runner producing stdout/stderr/prompt events.
 
-**Phase 2A acceptance**: `pnpm -F @trunner/cli test` passes and `pnpm -F @trunner/cli dev` shows a working TUI shell with mock data.
+**Phase 2A acceptance**: `pnpm -F @trunner/cli test` passes (14/14), `pnpm -F @trunner/cli dev` shows a working TUI shell with mock data, and `pnpm -F @trunner/cli build:sea:macos` produces a 137 MB self-contained `dist/trunner` binary that runs `--help` and `--mock terraform plan --auto-yes` correctly.
 
 ---
 

@@ -47,7 +47,7 @@ trunner/
 | --- | --- | --- |
 | Node | **26.1.0** exact | `.nvmrc` and `engines.node`. Use `nvm use` before anything else. |
 | pnpm | `pnpm@11.5.0` (enforced via `packageManager`) | Don't swap to npm/yarn. |
-| TypeScript | 5.6.3 | Strict, `noUncheckedIndexedAccess`, `noImplicitOverride`. |
+| TypeScript | `^6.0.3` | Strict, `noUncheckedIndexedAccess`, `noImplicitOverride`. Note: TS 6 deprecates `moduleResolution: bundler` when `module: preserve` is implied — keep `module: ESNext` + `moduleResolution: Bundler` explicit until that lands. |
 
 ## Command cheatsheet
 
@@ -69,6 +69,10 @@ pnpm -F @trunner/sdk typecheck
 pnpm -F @trunner/sdk build
 pnpm -F @trunner/sdk exec vitest run               # full suite — preferred form
 pnpm -F @trunner/sdk exec vitest run --dir test/unit   # NOTE: this filter is unreliable, see below
+pnpm -F @trunner/cli typecheck
+pnpm -F @trunner/cli build
+pnpm -F @trunner/cli build:sea:macos               # produce dist/trunner (~137 MB single-file binary)
+pnpm -F @trunner/cli exec vitest run               # 14 unit tests
 ```
 
 ## Gotchas (will cost you time if you don't know)
@@ -116,9 +120,9 @@ Two flags are on that bite often:
 - `noUncheckedIndexedAccess` — `arr[i]` and `obj[key]` are `T | undefined`. You must guard before use. See e.g. `runner/parser.ts` for the pattern.
 - `noImplicitOverride` — every `EventEmitter` override in `RunnerStream` (`on`, `off`, `once`, `removeListener`, `addListener`, `emit`) needs the `override` keyword. Same applies to any future class that extends `EventEmitter` or another base class.
 
-### 5. `@cdktf/hcl2json` is pinned to `latest`
+### 5. `@cdktf/hcl2json` is pinned to `^0.21.0`
 
-In `packages/sdk/package.json` it is `^"latest"` — intentional for the POC but it will churn the lockfile. The actual API surface to use is `parse(filename, contents): Record<string, unknown>` (NOT `parseToObject`). Output is `{ "<block>": [{ … }] }`; the SDK normalises this via an `unwrapRoot` helper in `tools/terraform/provider.ts`.
+In `packages/sdk/package.json` it is `^0.21.0` (released May 2025; caret range allows 0.21.x patches without lockfile churn). The actual API surface to use is `parse(filename, contents): Record<string, unknown>` (NOT `parseToObject`). Output is `{ "<block>": [{ … }] }`; the SDK normalises this via an `unwrapRoot` helper in `tools/terraform/provider.ts`.
 
 ### 6. Zip extraction is in-process
 
@@ -132,16 +136,25 @@ Everything the SDK exports comes from `packages/sdk/src/index.ts`. New types and
 
 `.github/workflows/` does not exist, even though `PLAN.md` §9 mentions a CI matrix. If you're asked to add CI, build it from scratch (macos-latest + ubuntu-latest + windows-latest, all pinned to Node 26.1.0).
 
+### 9. Node SEA requires `mainFormat: "module"` for ESM bundles
+
+The CLI ships an ESM bundle (Ink 7 + yoga-layout use TLA — won't bundle to CJS). When packaging it as a Node single-executable application (`packages/cli/sea-config.json` + `scripts/build-sea.sh`), the SEA's main script is loaded as CJS by default and will throw `SyntaxError: Cannot use import statement outside a module`. Fix: set `"mainFormat": "module"` in `sea-config.json`. **This is incompatible with `"useSnapshot": true`** — use `useCodeCache: true` instead. Use `node --build-sea sea-config.json` (Node 25.5+) for the one-step build — no `postject` needed. See `packages/cli/scripts/build-sea.sh` for the macOS/Linux pipeline; the `.ps1` script covers Windows.
+
+### 10. Top-level `await` in CLI entry crashes SEA at startup
+
+`trunner.tsx` (the CLI entry) must not use `await` at the top level. Wrap any `await` in an `async function main()` and call `main().catch(...)`. esbuild will reject TLA in CJS output, and SEA's CJS loader will also choke. The `main()` wrapper is the correct pattern.
+
 ## Test command order for a clean PR
 
 ```sh
 pnpm install && pnpm rebuild esbuild \
   && pnpm -r typecheck \
   && pnpm -F @trunner/sdk build \
-  && pnpm -F @trunner/sdk exec vitest run
+  && pnpm -F @trunner/cli build \
+  && pnpm -r test
 ```
 
-Typecheck must be clean; build must succeed; the full vitest run (54 tests) must pass.
+Typecheck must be clean; both packages must build; the full vitest run (54 SDK + 14 CLI tests) must pass. Add `pnpm -F @trunner/cli build:sea:macos` to verify the SEA pipeline locally before pushing.
 
 ## Adding a new `Tool` (OpenTofu / Terragrunt / …)
 

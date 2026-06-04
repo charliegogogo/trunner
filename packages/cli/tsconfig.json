@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "lib": ["DOM", "ESNext"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "test/**/*", "vitest.config.ts", "tsup.config.ts"],
+  "exclude": ["dist", "node_modules"]
+}

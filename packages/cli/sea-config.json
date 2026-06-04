@@ -1,0 +1,7 @@
+{
+  "main": "dist/trunner.mjs",
+  "output": "dist/trunner",
+  "mainFormat": "module",
+  "disableExperimentalSEAWarning": true,
+  "useCodeCache": true
+}
