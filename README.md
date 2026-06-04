@@ -13,11 +13,13 @@ The POC targets **Terraform only**; the architecture is designed so OpenTofu can
 | Phase | Scope | Status |
 | --- | --- | --- |
 | **Phase 1** | `@trunner/sdk` — Tool abstraction, runner, installer, Terraform implementation | ✅ Complete (full `init/plan/apply/destroy` cycle against a real Terraform binary) |
-| **Phase 2A** | CLI UI shell (React Ink) | ⏳ Planned |
-| **Phase 2B** | Desktop UI shell (Electron + Vite + React + Tailwind + Zustand) | ⏳ Planned |
-| **Phase 3A** | CLI features (real SDK wiring + SEA-packaged executables) | ⏳ Planned |
+| **Phase 2A** | CLI TUI shell (React Ink) + Node.js SEA pipeline (single-file native binary) | ✅ Complete (139 MB `dist/trunner` per platform) |
+| **Phase 2A.5** | Single-verb surface + `.trunnerrc` discovery + multi-workspace parallel execution + Claude-Code-style status bar | ⏳ Planned |
+| **Phase 2B** | Smart binary + provider version selection in the SDK (`tool.resolveAll`) | ⏳ Planned |
+| **Phase 2C** | Desktop UI shell (Electron + Vite + React + Tailwind + Zustand) | ⏳ Planned |
+| **Phase 3A** | CLI features (real SDK wiring + `.trunner` config + SEA-packaged executables) | ⏳ Planned |
 | **Phase 3B** | Desktop features (real SDK wiring + cross-platform installers) | ⏳ Planned |
-| **Phase 5** | OpenTofu implementation | ⏳ Post-POC |
+| **M7** | OpenTofu implementation | ⏳ Post-POC |
 
 See [`PLAN.md`](./PLAN.md) for the full plan.
 
@@ -66,8 +68,8 @@ trunner/
     │   ├── test/unit/         # Unit tests
     │   ├── test/integration/  # Full Terraform lifecycle test
     │   └── README.md          # SDK-level usage guide
-    ├── cli/                   # (Phase 2A) React Ink + meow, packaged as SEA
-    └── desktop/               # (Phase 2B) Electron + Vite + React + Tailwind + Zustand
+    ├── cli/                   # (Phase 2A ✅, 2A.5 ⏳) React Ink + meow, packaged as SEA
+    └── desktop/               # (Phase 2C ⏳) Electron + Vite + React + Tailwind + Zustand
 ```
 
 ---
@@ -76,8 +78,8 @@ trunner/
 
 ```
                         ┌────────────────────────────────┐
-                        │   Desktop (Electron + React)   │   ← Phase 2B / 3B
-                        │   CLI (React Ink)              │   ← Phase 2A / 3A
+                        │   Desktop (Electron + React)   │   ← Phase 2C / 3B
+                        │   CLI (React Ink)              │   ← Phase 2A / 2A.5 / 3A
                         └──────────────┬─────────────────┘
                                        │  IPC / process
                                        ▼
@@ -104,10 +106,13 @@ The **Tool** interface is the only contract a tool must satisfy. Adding OpenTofu
 ## Roadmap
 
 - **M1** ✅ Phase 1 — `@trunner/sdk` publishable, tested, real Terraform end-to-end
-- **M2** ⏳ Phase 2A + 2B — CLI TUI shell and Desktop UI shell both render against a mock runner
-- **M3** ⏳ Phase 3A — Production-grade CLI for Terraform workflows + SEA-packaged executables per platform
-- **M4** ⏳ Phase 3B — Production-grade Desktop app for Terraform workflows on macOS / Linux / Windows
-- **M5** ⏳ Post-POC — OpenTofu on the same `Tool` abstraction
+- **M2** ✅ Phase 2A — CLI TUI shell + Node.js SEA pipeline (single-file native binary per platform)
+- **M2.5** ⏳ Phase 2A.5 — single-verb `trunner <command>` surface + `.trunnerrc` discovery + multi-workspace parallel execution
+- **M3** ⏳ Phase 2B — smart binary + provider version selection in the SDK; one-shot `trunner plan` against a cold `~/.trunner`
+- **M4** ⏳ Phase 2C — Desktop UI shell mirroring the multi-workspace model
+- **M5** ⏳ Phase 3A — production-grade CLI for Terraform workflows + SEA-packaged executables per platform
+- **M6** ⏳ Phase 3B — production-grade Desktop app for Terraform workflows on macOS / Linux / Windows
+- **M7** ⏳ Post-POC — OpenTofu on the same `Tool` abstraction
 
 Tracked in detail in [`PLAN.md`](./PLAN.md) sections 7–11.
 

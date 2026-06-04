@@ -1,17 +1,17 @@
 # @trunner/sdk
 
-Core SDK for **trunner** — a cross-platform tool for running OpenTofu, Terraform, and Terragrunt.
+Core SDK for **trunner** — a cross-platform tool for running OpenTofu and Terraform.
 
 This package provides:
 
-- A **`Tool` abstraction** so new IaC tools (Terraform, OpenTofu, Terragrunt) can be plugged in without changing the CLI/Desktop surfaces.
+- A **`Tool` abstraction** so new IaC tools (Terraform, OpenTofu) can be plugged in without changing the CLI/Desktop surfaces.
 - A **binary manager** that downloads, verifies (SHA-256), and caches tool binaries in `~/.trunner/binaries/<tool>/<tool>-<version>[.exe]`.
 - A **provider manager** that resolves providers from the public Terraform Registry and writes them to the local plugin cache mirror.
 - An **EventEmitter-based runner** (`stdout` / `stderr` / `progress` / `prompt` / `exit`) that spawns tool processes, streams their output, detects interactive apply/destroy prompts, parses change counts, and supports cancellation via `AbortSignal`.
 - A **tool registry** so callers can look up tools by id.
 - HCL parsing adapters built on top of [`@cdktf/hcl2json`](https://www.npmjs.com/package/@cdktf/hcl2json).
 
-POC scope is **Terraform only**. OpenTofu and Terragrunt ship as placeholders ready to be implemented in later phases.
+POC scope is **Terraform only**. OpenTofu ships as a placeholder, ready to be implemented post-POC.
 
 ## Install
 
