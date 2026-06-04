@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { chmod } from 'node:fs/promises';
+import { chmod, readdir } from 'node:fs/promises';
 import type { ToolId, VersionInfo } from '../../types/tool.js';
 import type { Logger } from '../../utils/logger.js';
 import { ConsoleLogger, NoopLogger } from '../../utils/logger.js';
@@ -169,6 +169,35 @@ export abstract class BaseBinaryManager {
   async detectInstalledVersion(version: string): Promise<VersionInfo | null> {
     if (!(await this.isInstalled(version))) return null;
     return { version, raw: version, source: 'installed' };
+  }
+
+  /**
+   * List installed tool binary versions, newest-first. Returns version strings
+   * (e.g. `["1.7.0", "1.6.6"]`) parsed from the `${binaryName}-${version}${ext}`
+   * filenames in `binariesDir()`. Unknown / non-conforming filenames are
+   * silently skipped.
+   */
+  async listInstalled(): Promise<string[]> {
+    let entries: string[];
+    try {
+      entries = await readdir(this.binariesDir());
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw err;
+    }
+    const prefix = `${this.binaryName}-`;
+    const ext = this.platform.binaryExtension;
+    const versions: string[] = [];
+    for (const name of entries) {
+      if (!name.startsWith(prefix)) continue;
+      if (ext && !name.endsWith(ext)) continue;
+      if (ext && name.length <= prefix.length + ext.length) continue;
+      const version = name.slice(prefix.length, ext ? -ext.length : undefined);
+      if (version.length === 0) continue;
+      versions.push(version);
+    }
+    versions.sort((a, b) => b.localeCompare(a, 'en', { numeric: true }));
+    return versions;
   }
 
   // For subclass overrides (e.g. provider mirroring).

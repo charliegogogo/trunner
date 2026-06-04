@@ -2,7 +2,7 @@ import type { BaseBinaryManager } from '../tools/base/base-binary-manager.js';
 import type { BaseProviderManager } from '../tools/base/base-provider-manager.js';
 import type { CommandRegistry } from './command.js';
 
-export type ToolId = 'terraform' | 'opentofu' | 'terragrunt';
+export type ToolId = 'terraform' | 'opentofu';
 
 export interface VersionInfo {
   version: string;

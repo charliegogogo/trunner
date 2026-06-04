@@ -40,6 +40,15 @@ export type { ExtractResult, ExtractOptions } from './installer/extractor.js';
 export { download, fetchBuffer } from './installer/downloader.js';
 export type { DownloadOptions, DownloadResult } from './installer/downloader.js';
 
+export { parseRc, rcPathFor, RcParseError, TRUNNERRC_FILENAME } from './workspace/trunner-rc.js';
+export type { TrunnerRc, ParseRcWarning, ParseRcResult } from './workspace/trunner-rc.js';
+
+export { discoverWorkspaces, ALWAYS_EXCLUDE } from './workspace/discover.js';
+export type { Workspace, DiscoverOptions } from './workspace/discover.js';
+
+export { runWorkspaces } from './workspace/runner.js';
+export type { WorkspaceEvent, RunSummary, RunWorkspacesOptions } from './workspace/runner.js';
+
 export type {
   Tool,
   ToolId,
