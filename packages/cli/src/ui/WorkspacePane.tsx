@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box, Text, useInput, useWindowSize } from 'ink';
 import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
 import { ProgressBar } from './ProgressBar.js';
 import { Spinner } from './Spinner.js';
@@ -36,18 +36,21 @@ export function WorkspacePane({
     { isActive: isFocused },
   );
 
-  useEffect(() => {
-    // intentionally empty — useInput is registered above; this effect just
-    // keeps the dep tracking explicit when isFocused changes.
-  }, [isFocused]);
-
+  useWindowSize();
   const toolLabel = workspace.toolId
     ? `${workspace.toolId}${workspace.version ? ` ${workspace.version}` : ''}`
     : '?';
   const argsLabel = commandArgs.length > 0 ? ` ${commandArgs.join(' ')}` : '';
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={isFocused ? 'green' : 'gray'} paddingX={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={isFocused ? 'green' : 'gray'}
+      paddingX={1}
+      width="100%"
+      flexShrink={0}
+    >
       <Box marginBottom={1}>
         <Text bold>{workspace.dir}</Text>
         <Text> · {toolLabel} {command}{argsLabel}</Text>

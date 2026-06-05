@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput, useStdin } from 'ink';
+import { Box, Text, useApp, useInput, useStdin, useWindowSize } from 'ink';
 import { stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import {
@@ -171,8 +171,9 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
   }
 
   const focused = workspaces[focusedIndex] ?? null;
+  const { columns, rows } = useWindowSize();
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <Box flexDirection="column" width={columns} height={rows}>
       <StatusBar workspaces={workspaces} focusedIndex={focusedIndex} />
       {focused ? (
         <Box marginTop={1}>

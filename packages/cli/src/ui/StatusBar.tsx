@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useWindowSize } from 'ink';
 import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
 
 export interface StatusBarProps {
@@ -35,9 +35,21 @@ function formatElapsed(startedAt: number, endedAt: number | null, now: number): 
 }
 
 export function StatusBar({ workspaces, focusedIndex }: StatusBarProps): React.ReactElement {
+  // useWindowSize subscribes to stdout's 'resize' event so this component
+  // re-renders when the terminal is resized. The box's width="100%" then
+  // propagates the new size from the app's root box (which is itself
+  // sized via useWindowSize in app.tsx).
+  useWindowSize();
   const now = Date.now();
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="gray"
+      paddingX={1}
+      width="100%"
+      flexShrink={0}
+    >
       <Box marginBottom={1}>
         <Text bold>trunner</Text>
         <Text dimColor> · {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'}</Text>
