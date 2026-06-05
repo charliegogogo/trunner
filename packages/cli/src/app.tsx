@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useInput, useStdin, useWindowSize } from 'ink';
+import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import { stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import {
@@ -40,7 +40,6 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
   });
   const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
   const ink = useApp();
-  const { columns, rows } = useWindowSize();
   const { workspaces, focusedIndex, moveFocus, answerFocusedPrompt, summary } = useWorkspaces(
     iter,
     {
@@ -114,6 +113,7 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
   // workspace failure or discover error.
   useEffect(() => {
     if (state.phase !== 'error' && state.phase !== 'done') return;
+    if (process.env['TRUNNER_KEEP_ALIVE'] === '1') return;
     if (state.phase === 'error') {
       process.exitCode = 1;
     } else {
@@ -173,21 +173,20 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
 
   const focused = workspaces[focusedIndex] ?? null;
   return (
-    <Box flexDirection="column" width={columns} height={rows}>
+    <Box flexDirection="column">
       <StatusBar workspaces={workspaces} focusedIndex={focusedIndex} />
       {focused ? (
-        <Box marginTop={1}>
-          <WorkspacePane
-            workspace={focused}
-            command={command}
-            commandArgs={commandArgs}
-            autoApprove={flags.autoApprove}
-            color={flags.color}
-            isFocused
-            onPromptAnswer={answerFocusedPrompt}
-            onTab={() => moveFocus(1)}
-          />
-        </Box>
+        <WorkspacePane
+          workspace={focused}
+          command={command}
+          commandArgs={commandArgs}
+          autoApprove={flags.autoApprove}
+          color={flags.color}
+          isFocused
+          marginTop={1}
+          onPromptAnswer={answerFocusedPrompt}
+          onTab={() => moveFocus(1)}
+        />
       ) : null}
     </Box>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text, useWindowSize } from 'ink';
+import { Box, Text } from 'ink';
 import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
 
 export interface StatusBarProps {
@@ -35,11 +35,14 @@ function formatElapsed(startedAt: number, endedAt: number | null, now: number): 
 }
 
 export function StatusBar({ workspaces, focusedIndex }: StatusBarProps): React.ReactElement {
-  // useWindowSize subscribes to stdout's 'resize' event so this component
-  // re-renders when the terminal is resized. The box's width="100%" then
-  // propagates the new size from the app's root box (which is itself
-  // sized via useWindowSize in app.tsx).
-  useWindowSize();
+  // Width is owned by Yoga: the outer flex-column root is sized to the
+  // terminal by Ink, and width="100%" makes this box fill it. On resize,
+  // Ink's internal 'resize' handler calls log.clear() + calculateLayout()
+  // + onRender() (see ink.tsx:resized), which re-flows this box through
+  // Yoga without any React state change on our side. We do NOT subscribe
+  // to stdout's 'resize' here on purpose — adding a second listener races
+  // with Ink's and causes a second throttled write that doesn't go through
+  // log.clear(), leaving stale border / text cells on screen.
   const now = Date.now();
   return (
     <Box

@@ -24,6 +24,7 @@ const cli = meow(
       --mirror <url>            Override the default terraform + provider mirror (Phase 2B)
       --concurrency <n>         Max workspaces running in parallel (default: os.cpus().length)
       --exclude <dir>           Add <dir> to the scan's exclude set (repeatable)
+      --no-alt-screen           Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals)
       --json                    Emit one JSON line per workspace event (CI-friendly; no TUI)
       --quiet                   Suppress the status bar; emit only the final summary
       --auto-approve            Pass --auto-approve / -auto-approve when supported
@@ -55,6 +56,7 @@ const cli = meow(
       quiet: { type: 'boolean', default: false },
       autoApprove: { type: 'boolean', default: false },
       color: { type: 'boolean', default: true },
+      altScreen: { type: 'boolean', default: true },
     },
   },
 );
@@ -81,12 +83,33 @@ async function main(): Promise<void> {
   }
 
   const flags: CliFlags = parseFlags(cli);
+  // Force Ink into interactive mode whenever stdout could be a real TTY.
+  // The default auto-detection (`!isInCi && Boolean(stdout.isTTY)`) is too
+  // conservative: in the SEA binary `process.stdout.isTTY` is `undefined`
+  // for some launch contexts even when the user is attached to iTerm/tmux,
+  // which silently downgrades us to non-interactive mode and disables
+  // SIGWINCH handling — leaving the layout frozen at the initial width.
+  // Piped output (e.g. `trunner plan | cat`) is detected via
+  // `isTTY === false` and is left in non-interactive mode.
+  const interactive = process.stdout.isTTY !== false;
+  // Alternate screen buffer: when a reflow-capable terminal (Ghostty,
+  // modern iTerm) is resized, it re-wraps the existing primary-buffer
+  // content — which corrupts Ink's carefully-positioned border cells.
+  // The alt-screen is a separate buffer that gets switched in/out
+  // atomically, so its content is immune to reflow. We opt in whenever
+  // we're going interactive, with a `--no-alt-screen` escape hatch for
+  // users who want the previous scrollback-preserving behavior.
+  const alternateScreen = flags.altScreen && interactive;
   const app = render(
     React.createElement(App, {
       command: verb,
       commandArgs: subArgs,
       flags,
     }),
+    {
+      ...(interactive ? { interactive: true } : {}),
+      ...(alternateScreen ? { alternateScreen: true } : {}),
+    },
   );
   await app.waitUntilExit();
 }
@@ -137,6 +160,7 @@ function parseFlags(cli: { flags: Record<string, unknown> }): CliFlags {
     quiet: f.quiet === true,
     autoApprove: f.autoApprove === true,
     color: f.color !== false,
+    altScreen: f.altScreen !== false,
   };
 }
 

@@ -12,4 +12,5 @@ export interface CliFlags {
   quiet: boolean;
   autoApprove: boolean;
   color: boolean;
+  altScreen: boolean;
 }

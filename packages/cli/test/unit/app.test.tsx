@@ -15,6 +15,7 @@ const baseFlags: CliFlags = {
   quiet: false,
   autoApprove: false,
   color: true,
+  altScreen: true,
 };
 
 let tmpDir: string | null = null;
