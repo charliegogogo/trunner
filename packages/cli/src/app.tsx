@@ -40,6 +40,7 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
   });
   const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
   const ink = useApp();
+  const { columns, rows } = useWindowSize();
   const { workspaces, focusedIndex, moveFocus, answerFocusedPrompt, summary } = useWorkspaces(
     iter,
     {
@@ -171,7 +172,6 @@ export function App({ command, commandArgs, flags }: AppProps): React.ReactEleme
   }
 
   const focused = workspaces[focusedIndex] ?? null;
-  const { columns, rows } = useWindowSize();
   return (
     <Box flexDirection="column" width={columns} height={rows}>
       <StatusBar workspaces={workspaces} focusedIndex={focusedIndex} />
