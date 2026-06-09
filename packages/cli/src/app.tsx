@@ -14,7 +14,8 @@ import {
 import { useWorkspaces, type WorkspaceDisplay } from './hooks/useWorkspaces.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ExecutionView } from './ui/ExecutionView.js';
-import { InteractiveWizard } from './ui/InteractiveWizard.js';
+import { InteractiveWizard, type InteractiveWizardResult } from './ui/InteractiveWizard.js';
+import { ManagementView } from './ui/ManagementView.js';
 import type { CliFlags } from './types.js';
 
 export interface AppProps {
@@ -102,6 +103,8 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [defaultRc, setDefaultRc] = useState<any>(null);
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
+  const [interactiveCategory, setInteractiveCategory] = useState<'run' | 'manage' | null>(null);
+  const [managementTarget, setManagementTarget] = useState<'tools' | 'providers' | null>(null);
 
   useEffect(() => {
     if (!interactiveMode) return;
@@ -120,8 +123,28 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     })();
   }, [interactiveMode, flags.cwd]);
 
+  const { width: termWidth, height: termHeight } = useTerminalSize();
+
   if (interactiveMode) {
-    if (selectedCommand && selectedTool) {
+    // Show ManagementView if in manage category
+    if (interactiveCategory === 'manage' && managementTarget && selectedTool) {
+      return (
+        <ManagementView
+          tool={selectedTool}
+          target={managementTarget}
+          width={termWidth}
+          height={termHeight}
+          onExit={() => {
+            setInteractiveCategory(null);
+            setManagementTarget(null);
+            setSelectedCommand(null);
+          }}
+        />
+      );
+    }
+
+    // Show ExecutionView if in run category with command selected
+    if (interactiveCategory === 'run' && selectedCommand && selectedTool) {
       return (
         <App
           command={selectedCommand}
@@ -132,12 +155,19 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         />
       );
     }
+
+    // Show InteractiveWizard
     return (
       <InteractiveWizard
         defaultRc={defaultRc}
-        onComplete={(result) => {
-          setSelectedCommand(result.command);
+        onComplete={(result: InteractiveWizardResult) => {
           setSelectedTool(result.tool);
+          setInteractiveCategory(result.category);
+          if (result.category === 'run') {
+            setSelectedCommand(result.command);
+          } else if (result.category === 'manage' && result.managementTarget) {
+            setManagementTarget(result.managementTarget);
+          }
         }}
       />
     );
@@ -278,8 +308,6 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       }
     }
   }, [state.phase, state.summary, summary, ink, keepAlive, workspaces, onExit]);
-
-  const { width: termWidth, height: termHeight } = useTerminalSize();
 
   if (state.phase === 'error') {
     return (
