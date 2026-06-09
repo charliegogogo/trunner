@@ -3,5 +3,8 @@
   "output": "dist/trunner",
   "mainFormat": "module",
   "disableExperimentalSEAWarning": true,
-  "useCodeCache": true
+  "useCodeCache": true,
+  "assets": {
+    "main.wasm.gz": "../../node_modules/.pnpm/@cdktf+hcl2json@0.21.0/node_modules/@cdktf/hcl2json/main.wasm.gz"
+  }
 }

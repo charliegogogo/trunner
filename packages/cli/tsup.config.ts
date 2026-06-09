@@ -16,32 +16,66 @@ interface EsbuildPlugin {
   }): void;
 }
 
-const inlineHcl2jsonWasm: EsbuildPlugin = {
-  name: 'inline-hcl2json-wasm',
+/**
+ * Plugin to replace @cdktf/hcl2json's WASM loading with our SEA-compatible shim.
+ * 
+ * Instead of inlining WASM as base64 (33% overhead), we:
+ * 1. Replace the loadWasm function in bridge.js with inline logic
+ * 2. The inline logic uses node:sea API when in SEA mode, falls back to fs.readFile in dev
+ * 3. The WASM file is bundled as a SEA asset (no encoding overhead)
+ */
+const replaceWasmLoader: EsbuildPlugin = {
+  name: 'replace-wasm-loader',
   setup(build) {
     const filter = /[\\/]@cdktf[\\/]hcl2json[\\/]lib[\\/]bridge\.js$/;
     build.onLoad({ filter }, async (args) => {
       const src = await readFile(args.path, 'utf8');
-      const wasmAbsPath = sdkRequire.resolve('@cdktf/hcl2json/main.wasm.gz');
-      const wasm = await readFile(wasmAbsPath);
-      const b64 = wasm.toString('base64');
-      const replacement = `Buffer.from(${JSON.stringify(b64)}, 'base64')`;
-      const patterns = [
-        /(?:[\w$]+\.)?readFile\([\s\S]*?main\.wasm\.gz[\s\S]*?\)\)/,
-      ];
+      
+      // Inline WASM loading logic that works in both SEA and non-SEA environments
+      // Uses require with a string variable to avoid esbuild transforming the module name
+      // The "node:" prefix must be preserved for the sea module to work
+      const replacement = `const loadWasm = async () => {
+    const zlib = require("zlib");
+    const fs = require("fs");
+    const path = require("path");
+    
+    // Check if running in SEA mode
+    // IMPORTANT: Use a variable to prevent esbuild from transforming the module name
+    const seaModuleName = "node:sea";
+    let isSea = false;
+    try {
+        const sea = require(seaModuleName);
+        isSea = sea.isSea();
+    } catch {
+        // node:sea not available or not in SEA mode
+    }
+    
+    let compressedBytes;
+    if (isSea) {
+        // Load from SEA assets
+        const sea = require(seaModuleName);
+        compressedBytes = Buffer.from(sea.getAsset("main.wasm.gz"));
+    } else {
+        // Load from filesystem (development mode)
+        compressedBytes = fs.readFileSync(path.join(__dirname, "..", "main.wasm.gz"));
+    }
+    
+    return zlib.gunzipSync(compressedBytes);
+};`;
+      
+      // Replace the loadWasm function
+      const loadWasmPattern = /const loadWasm = async \(\) => \{[\s\S]*?return \(0, zlib_1\.gunzipSync\)\(await fs\.readFile\(\(0, path_1\.join\)\(__dirname, "\.\.", "main\.wasm\.gz"\)\)\);\s*\};/;
+      
       let patched = src;
-      for (const pattern of patterns) {
-        if (pattern.test(patched)) {
-          patched = patched.replace(pattern, replacement);
-          break;
-        }
-      }
-      if (patched === src) {
+      if (loadWasmPattern.test(patched)) {
+        patched = patched.replace(loadWasmPattern, replacement);
+      } else {
         throw new Error(
-          'inline-hcl2json-wasm: failed to patch bridge.js — none of the known patterns matched. ' +
+          'replace-wasm-loader: failed to patch bridge.js — loadWasm pattern not found. ' +
           'Check whether @cdktf/hcl2json updated its WASM loading strategy.',
         );
       }
+      
       return { contents: patched, loader: 'js' };
     });
   },
@@ -60,7 +94,7 @@ export default defineConfig({
   clean: true,
   shims: false,
   splitting: false,
-  esbuildPlugins: [inlineHcl2jsonWasm],
+  esbuildPlugins: [replaceWasmLoader],
   esbuildOptions(options) {
     options.jsx = 'automatic';
     options.banner = {
