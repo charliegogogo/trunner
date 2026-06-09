@@ -1,5 +1,11 @@
 import type { ChangeCounts, ParsedSummary } from '../types/result.js';
 
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
+
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, '');
+}
+
 const PLAN_RE = /Plan:\s+(\d+)\s+to\s+add,\s+(\d+)\s+to\s+change,\s+(\d+)\s+to\s+destroy/;
 const PLAN_DESTROY_RE = /Plan:\s+(\d+)\s+to\s+destroy/;
 const APPLY_RESULT_RE =
@@ -14,9 +20,10 @@ export interface ParseOptions {
 
 export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: ParseOptions = {}): ParsedSummary {
   const combined = `${stdout}\n${stderr}`;
+  const clean = stripAnsi(combined);
   const summary: ParsedSummary = {};
 
-  const planMatch = combined.match(PLAN_RE);
+  const planMatch = clean.match(PLAN_RE);
   if (planMatch) {
     const counts: ChangeCounts = {
       add: Number.parseInt(planMatch[1]!, 10),
@@ -26,7 +33,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
     counts.total = counts.add + counts.change + counts.destroy;
     summary.changes = counts;
   } else {
-    const destroyMatch = combined.match(PLAN_DESTROY_RE);
+    const destroyMatch = clean.match(PLAN_DESTROY_RE);
     if (destroyMatch) {
       const counts: ChangeCounts = {
         add: 0,
@@ -38,7 +45,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
     }
   }
 
-  const applyMatch = combined.match(APPLY_RESULT_RE);
+  const applyMatch = clean.match(APPLY_RESULT_RE);
   if (applyMatch) {
     const counts: ChangeCounts = {
       add: Number.parseInt(applyMatch[1]!, 10),
@@ -49,7 +56,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
     summary.changes = counts;
   }
 
-  const destroyMatch = combined.match(DESTROY_RESULT_RE);
+  const destroyMatch = clean.match(DESTROY_RESULT_RE);
   if (destroyMatch) {
     const counts: ChangeCounts = {
       add: 0,
@@ -63,7 +70,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
   if (opts.includeDiagnostics) {
     const errors: string[] = [];
     const warnings: string[] = [];
-    for (const line of combined.split(/\r?\n/)) {
+    for (const line of clean.split(/\r?\n/)) {
       const em = line.match(ERROR_RE);
       if (em) errors.push(em[1]!.trim());
       else if (/(^|\s)(Warning|warning):/.test(line)) warnings.push(line.trim());
@@ -72,6 +79,6 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
     if (warnings.length) summary.warnings = warnings;
   }
 
-  summary.rawLines = combined.split(/\r?\n/).length;
+  summary.rawLines = clean.split(/\r?\n/).length;
   return summary;
 }

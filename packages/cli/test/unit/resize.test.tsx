@@ -103,6 +103,7 @@ function makeWs(dir: string, overrides: Partial<WorkspaceDisplay> = {}): Workspa
     exitSignal: null,
     startedAt: Date.now(),
     endedAt: null,
+    parsedResult: null,
     ...overrides,
   };
 }

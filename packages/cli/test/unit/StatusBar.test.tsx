@@ -26,6 +26,7 @@ function mkWs(overrides: Partial<WorkspaceDisplay> & { dir: string }): Workspace
     exitSignal: overrides.exitSignal ?? null,
     startedAt: overrides.startedAt ?? Date.now() - 5000,
     endedAt: overrides.endedAt ?? null,
+    parsedResult: overrides.parsedResult ?? null,
   };
 }
 

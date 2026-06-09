@@ -3,7 +3,7 @@
 > Cross-platform CLI + Desktop tool for running OpenTofu / Terraform commands.
 > POC scope is **Terraform only**, with extensibility designed in for OpenTofu. Terragrunt support is **explicitly cut from POC scope** (§1) — its module/provide model diverges from Terraform in ways not worth the design cost right now.
 >
-> **CLI surface is single-verb with tool-as-config**, not the typical `<tool> <command>` pattern. From a project directory (or any ancestor of one) `trunner plan` discovers all `.trunnerrc` workspaces in the subtree, resolves tool + provider versions, and runs the command against every workspace in parallel — with a Claude-Code-style status bar on top and a switchable stream view per workspace. See §5.1 and §4.8.
+> **CLI surface is single-verb with tool-as-config**, not the typical `<tool> <command>` pattern. From a project directory (or any ancestor of one) `trunner plan` discovers all `.trunnerrc` workspaces in the subtree, resolves tool + provider versions, and runs the command against every workspace in parallel — with a Claude-Code-style carousel view and a switchable stream view per workspace. See §5.1 and §4.8.
 
 ---
 
@@ -11,7 +11,7 @@
 
 ### Goals
 - Unified execution surface for IaC tools (Terraform in POC, OpenTofu later).
-- **Monorepo-first**: one `trunner <command>` invocation discovers and runs against every `.trunnerrc` workspace in the cwd subtree, in parallel. Top-level UI shows a status bar; user can switch into any workspace's live output. (See §4.8 and Phase 2A.5.)
+- **Monorepo-first**: one `trunner <command>` invocation discovers and runs against every `.trunnerrc` workspace in the cwd subtree, in parallel. Top-level UI shows a carousel view; user can switch into any workspace's live output. (See §4.8 and Phase 2A.5.)
 - Monorepo with three packages: `sdk`, `cli`, `desktop`.
 - Consistent developer experience (pnpm + TypeScript everywhere).
 - Extensible `Tool` abstraction so new tools can be added without touching CLI/Desktop.
@@ -313,6 +313,7 @@ A **workspace** is a directory containing a `.trunnerrc` file. `trunner <command
 tool = "terraform"            # or "opentofu"
 
 # optional
+command    = "plan"           # default command for interactive mode (plan/apply/destroy/init/validate)
 version    = "~> 1.6"         # tool binary version constraint (consumed by Phase 2B's solver)
 concurrency = 8               # override os.cpus().length for this workspace's run slot
 exclude    = ["vendor", "build"]  # extra dirs to skip during recursive scan (see §4.8.2)
@@ -384,9 +385,13 @@ For each workspace picked off the queue:
 3. Stream stdout/stderr through the `WorkspaceEvent` channel tagged with the workspace.
 4. On exit, mark the workspace as `done` with the exit code; the next worker picks up the next workspace.
 
-#### 4.9.3 UI Model (Claude Code / opencode style)
+#### 4.9.3 UI Model
 
-Top-level view: a status bar with one entry per workspace — `team-a/api · running · 12s`, `team-b/web · done (3 to add)`, `team-c/db · failed (exit 1)`. The user can press a key (e.g. `Tab` / `j`/`k` / arrow keys) to switch the **detail pane** between workspaces and view the live `OutputView` of the focused workspace. Phase 2A.5 ships a TUI version; the Desktop phase (2C) ships the same model in React with a richer output panel.
+**Interactive mode**: `trunner` with no arguments shows `InteractiveWizard` — a step-by-step wizard to select command and tool. Reads defaults from `.trunnerrc`. Only ↑/↓ navigation (no j/k).
+
+**Command execution**: `trunner <command>` shows `ExecutionView` — a carousel view with tabs for each discovered working directory. Purple borders. Tab switching with ←/→ keys. Output scrolling with ↑/↓ keys. Shows all working directories simultaneously with their status (running ✓/✗/⏳).
+
+**Post-execution**: `QuietMode` shows per-working-directory results with status codes. Press Esc to exit. Results printed to stdout after Ink exits using ANSI color codes (green=success, red=failure).
 
 A failed workspace does **not** abort the rest — all workspaces run to completion, the summary at the end reports per-workspace exit codes, and the overall process exit code is `0` if all succeeded, `1` otherwise.
 
@@ -399,14 +404,30 @@ A failed workspace does **not** abort the rest — all workspaces run to complet
 Single-verb, tool-as-config. Tool is determined by `.trunnerrc` in the current workspace or by `-t` on the command line — never as a positional argument.
 
 ```
-trunner <command> [args...]         # e.g. trunner plan, trunner apply -auto-approve
-trunner tools                       # list installed tools + their versions
-trunner tools install <name> [ver]  # e.g. trunner tools install terraform 1.6.6
-trunner providers                   # list installed providers (per-workspace mirror)
-trunner providers install <source>  # e.g. trunner providers install hashicorp/aws
-trunner config get|set              # global config (mirror, default tool, etc.)
+trunner                            # Interactive mode: wizard to select command and tool
+trunner <command> [args...]        # e.g. trunner plan, trunner apply -auto-approve
+trunner tools                      # list installed tools + their versions
+trunner tools install <name> [ver] # e.g. trunner tools install terraform 1.6.6
+trunner providers                  # list installed providers (per-workspace mirror)
+trunner providers install <source> # e.g. trunner providers install hashicorp/aws
+trunner config get|set             # global config (mirror, default tool, etc.)
 trunner --version
 ```
+
+**Interactive mode** (`trunner` with no arguments):
+- Shows a step-by-step wizard: select command (↑/↓), then select tool (↑/↓)
+- Defaults are read from `.trunnerrc` if present (e.g. `command = "plan"`, `tool = "terraform"`)
+- After selection, runs the command across all discovered working directories
+
+**Non-interactive mode** (`trunner <command>`):
+- Runs the command directly across all discovered working directories
+- Shows a carousel view with tabs for each working directory (←/→ to switch, ↑/↓ to scroll output)
+- After completion, press Esc to exit — results are printed to stdout with colorized table output
+
+**Exit behavior**:
+- By default, trunner stays alive after command completion (press Esc to exit)
+- Set `TR_KEEP_ALIVE=0` to auto-exit after completion
+- Ctrl+C forces immediate exit at any time
 
 If `trunner <command>` is run with no `.trunnerrc` found under cwd (and no `-t` / `--cwd` set), trunner errors with a structured message:
 
@@ -424,10 +445,11 @@ hint: cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <to
 | `--tool-version <semver>` | Pin the tool binary version (e.g. `1.6.6`, `~> 1.6`). Overrides `.trunnerrc`'s `version` and the project's HCL `required_version`. | `auto` |
 | `--include-prerelease` | Allow pre-release versions (`1.0.0-rc1`) in the solver candidate list. | off |
 | `--mirror <url>` | Override the default terraform + provider mirror. | unset |
-| `--concurrency <n>` | Max workspaces running in parallel. | `os.cpus().length` |
+| `--concurrency <n>` | Max working directories running in parallel. | `os.cpus().length` |
 | `--exclude <dir>` | Add `<dir>` to the scan's exclude set. Repeatable. | empty |
-| `--json` | Emit a single JSON line per workspace event (CI-friendly; no TUI). | off |
-| `--quiet` | Suppress per-workspace status bar; emit only the final summary. | off |
+| `--json` | Emit a single JSON line per working directory event (CI-friendly; no TUI). | off |
+| `--quiet` | Suppress per-working-directory carousel view; emit only the final summary. | off |
+| `--no-alt-screen` | Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals). | off |
 
 Note: `--version` is reserved for the trunner version (`trunner --version` → `0.x.y`). Tool version pinning uses `--tool-version` to avoid clashing.
 
@@ -435,11 +457,15 @@ Note: `--version` is reserved for the trunner version (`trunner --version` → `
 
 ```
 packages/cli/src/
-├── trunner.tsx                      # entry (renamed from bin.tsx to match bundle basename)
-├── app.tsx                          # Root <App/>: parses flags, calls workspace.discover + workspace.runner
+├── trunner.tsx                      # entry (single-verb parsing, global flags)
+├── app.tsx                          # Root <App/>: interactive wizard or command execution
 ├── ui/
-│   ├── StatusBar.tsx                # top-level: one card per workspace
-│   ├── WorkspacePane.tsx            # detail view for the focused workspace
+│   ├── ExecutionView.tsx            # Carousel view with tabs for each working directory
+│   ├── QuietMode.tsx                # Summary view after command completion
+│   ├── InteractiveWizard.tsx        # Step-by-step wizard for interactive mode
+│   ├── WorkspaceOutput.tsx          # Raw ANSI output display for a single workspace
+│   ├── StatusBar.tsx                # (legacy) top-level card list
+│   ├── WorkspacePane.tsx            # (legacy) detail view for focused workspace
 │   ├── Spinner.tsx
 │   ├── ProgressBar.tsx
 │   ├── Confirm.tsx                  # Drives Runner.prompt (forwarded to focused workspace)
@@ -447,15 +473,33 @@ packages/cli/src/
 ├── ipc/                             # (Phase 3A) typed wrapper for IPC push events
 └── hooks/
     ├── useWorkspaces.ts             # AsyncIterable<WorkspaceEvent> → React state
+    ├── useTerminalSize.ts           # Terminal resize detection
     └── useRunner.ts                 # Single-workspace runner (used by ipc/ in Phase 3A)
 ```
 
 ### 5.3 UI Behaviors
 
-- `StatusBar`: top-level — one card per discovered workspace showing state (`pending` / `resolving` / `running` / `done (N changes)` / `failed (exit N)`) and elapsed time. Highlighted card = focused workspace.
-- `WorkspacePane`: detail view for the focused workspace — embedded `OutputView` (ANSI parsing via `ansi-to-react` + plan/apply key-line highlight).
+**Interactive mode** (`trunner` with no arguments):
+- `InteractiveWizard`: Step-by-step wizard with purple borders. Navigate with ↑/↓ keys, select with Enter. Steps: select command (plan/apply/destroy/init/validate) → select tool (terraform/opentofu). Reads defaults from `.trunnerrc` if present. No j/k navigation — only arrow keys.
+
+**Command execution** (`trunner <command>`):
+- `ExecutionView`: Carousel view with tabs for each discovered working directory. Purple borders. Tab switching with ←/→ keys. Output scrolling with ↑/↓ keys. Shows all working directories simultaneously with their status (running ✓/✗/⏳).
+
+**Post-execution**:
+- `QuietMode`: Summary view after command completion. Shows per-working-directory results with status codes. Press Esc to exit.
+
+**Output rendering**:
+- `WorkspaceOutput`: Renders raw ANSI output for a single working directory. Used inside `ExecutionView` tabs and `QuietMode` cards.
+
 - `useWorkspaces`: subscribes to the `AsyncIterable<WorkspaceEvent>` from `workspace.runner.runWorkspaces` and routes each event to the right workspace's state slot in the React tree.
-- `Confirm`: a per-workspace prompt — only the focused workspace can prompt; tabbing away auto-defers (cancels with `no`) so a prompt from workspace B never blocks workspace A.
+- `useTerminalSize`: Live terminal resize detection via `process.stdout.on('resize')`. Prevents layout corruption on terminal resize.
+
+**Exit behavior**:
+- By default, trunner stays alive after command completion (press Esc to exit).
+- Set `TR_KEEP_ALIVE=0` to auto-exit after completion.
+- Ctrl+C forces immediate exit at any time.
+- Results are printed to stdout after Ink exits using ANSI color codes (green=success, red=failure).
+
 - Top-level error boundary surfaces structured errors and exit codes; on `trunner plan` failure of any workspace, the top-level exit code is `1` and the summary lists which workspace(s) failed.
 
 ### 5.4 Build & Packaging — Node.js SEA
@@ -642,7 +686,7 @@ Each phase ends with passing tests and a working demo.
 
 ### Phase 2A.5 — CLI Surface, `.trunnerrc` & Multi-Project
 
-**Goal**: Replace the provisional `<tool> <command>` shape with the final single-verb surface; introduce `.trunnerrc` workspace discovery; run the command against every discovered workspace in parallel with a Claude-Code-style status bar. This phase makes `trunner plan` in a monorepo do the right thing without flags. See §4.8, §4.9, and §5.1 for the full design.
+**Goal**: Replace the provisional `<tool> <command>` shape with the final single-verb surface; introduce `.trunnerrc` workspace discovery; run the command against every discovered workspace in parallel with a Claude-Code-style carousel view. This phase makes `trunner plan` in a monorepo do the right thing without flags. See §4.8, §4.9, and §5.1 for the full design.
 
 **Implementation order** (each step unblocks the next):
 
@@ -650,8 +694,8 @@ Each phase ends with passing tests and a working demo.
 2. **`workspace/discover.ts`** — `discoverWorkspaces(cwd, { exclude })` implementing the §4.8.2 algorithm (always-skip `.git`/`.terraform`, project-boundary at `.trunnerrc`, no symlink following, no scan-up). Unit tests: single workspace, nested `.trunnerrc` (boundary), hidden `.git` skipped, exclude patterns respected, no symlink loops. **~1.5h**
 3. **CLI flag plumbing** — extend `trunner.tsx` meow config with all global flags from §5.1 (`-t`, `--cwd`, `--tool-version`, `--include-prerelease`, `--mirror`, `--concurrency`, `--exclude`, `--json`, `--quiet`). Re-export from `packages/sdk/src/index.ts`. **~1h**
 4. **`workspace/runner.ts`** — `runWorkspaces(workspaces, command, args, opts)` returning `AsyncIterable<WorkspaceEvent>`. Worker-pool with concurrency = `os.cpus().length` (overridable). Per-workspace: `tool.resolveAll` → spawn tool binary with `cwd = ws.dir` and `TF_CLI_CONFIG_FILE` set → stream tagged events. Failures do not abort siblings; final `done` event carries the per-workspace exit-code map. **~2h**
-5. **CLI TUI** — `ui/StatusBar.tsx` (top-level card list, key-based navigation: `Tab` / `j` / `k` / arrow keys), `ui/WorkspacePane.tsx` (focused workspace detail), `hooks/useWorkspaces.ts` (subscribes to the `AsyncIterable`, routes events to React state). **~2h**
-6. **Component tests** — extend `ink-testing-library` suite: 5+ tests for `StatusBar` (workspace state transitions), 3+ for `useWorkspaces` (event routing, multi-stream multiplexing). **~1h**
+5. **CLI TUI** — `ui/ExecutionView.tsx` (carousel view with tabs for each workspace), `ui/InteractiveWizard.tsx` (interactive mode wizard), `hooks/useWorkspaces.ts` (subscribes to the `AsyncIterable`, routes events to React state), `hooks/useTerminalSize.ts` (live terminal resize detection). **~2h**
+6. **Component tests** — extend `ink-testing-library` suite: 5+ tests for `ExecutionView` (workspace state transitions), 3+ for `useWorkspaces` (event routing, multi-stream multiplexing). **~1h**
 7. **End-to-end smoke** — create a 3-workspace fixture under a tmp dir, run `trunner plan` against it, verify all 3 run in parallel (3 progress events before any `done`), final summary lists all 3 results. **~0.5h**
 
 **Total estimate**: ~8.5h. SDK is the bulk (steps 1, 2, 4); CLI TUI (steps 5, 6) is the rest.
@@ -660,14 +704,14 @@ Each phase ends with passing tests and a working demo.
 - [ ] Step 2: `workspace/discover.ts` (scan algorithm + project boundary + excludes).
 - [ ] Step 3: CLI global flags (`-t`, `--cwd`, `--tool-version`, `--include-prerelease`, `--mirror`, `--concurrency`, `--exclude`, `--json`, `--quiet`).
 - [ ] Step 4: `workspace/runner.ts` (worker-pool + stream multiplexing).
-- [ ] Step 5: `StatusBar` + `WorkspacePane` + `useWorkspaces` TUI.
+- [ ] Step 5: `ExecutionView` + `InteractiveWizard` + `useWorkspaces` TUI.
 - [ ] Step 6: component tests for multi-workspace routing.
 - [ ] Step 7: end-to-end smoke on a 3-workspace fixture.
 - [ ] Re-export `discoverWorkspaces`, `runWorkspaces`, `Workspace`, `WorkspaceEventMap` from `packages/sdk/src/index.ts`.
 - [ ] Deprecate the old `<tool> <command>` shape (remove `commands/<tool>/*.tsx` scaffolding; keep the file layout for later per-tool subcommand files in Phase 3A).
 - [ ] Re-verify `pnpm -r typecheck` and `pnpm -F @trunner/sdk build` are clean.
 
-**Phase 2A.5 acceptance**: In a tmp monorepo with three `.trunnerrc` workspaces (`team-a/api` terraform 1.6, `team-b/web` terraform 1.5, `team-c/db` opentofu), running `trunner plan` discovers all three, runs them in parallel (concurrent tool processes, status bar shows `running` per workspace), and produces a final summary with per-workspace results. `trunner plan -t opentofu` overrides every workspace's tool to opentofu. `trunner plan --concurrency 1` serializes. `trunner plan --exclude vendor` skips a `vendor/.trunnerrc` (fixture has it). The old `--mock terraform plan --auto-yes` shape is removed; the new shape is the only supported surface.
+**Phase 2A.5 acceptance**: In a tmp monorepo with three `.trunnerrc` workspaces (`team-a/api` terraform 1.6, `team-b/web` terraform 1.5, `team-c/db` opentofu), running `trunner plan` discovers all three, runs them in parallel (carousel view shows `running` per workspace), and produces a final summary with per-working-directory results. `trunner plan -t opentofu` overrides every workspace's tool to opentofu. `trunner plan --concurrency 1` serializes. `trunner plan --exclude vendor` skips a `vendor/.trunnerrc` (fixture has it). The old `--mock terraform plan --auto-yes` shape is removed; the new shape is the only supported surface. `trunner` with no arguments shows interactive wizard to select command and tool.
 
 ---
 
@@ -823,7 +867,7 @@ CI matrix (GitHub Actions): `macos-latest`, `ubuntu-latest`, `windows-latest`, a
 
 - **M1 — Phase 1 complete**: `@trunner/sdk` publishable, tested, runs real Terraform end-to-end.
 - **M2 — Phase 2A complete**: CLI TUI shell renders and consumes mock runners; SEA pipeline produces a working single-file binary. *(Provisional `<tool> <command>` shape ships here; superseded in M2.5.)*
-- **M2.5 — Phase 2A.5 complete**: New single-verb surface, `.trunnerrc` discovery, multi-workspace parallel execution with status bar — `trunner plan` in a monorepo discovers and runs against every workspace in parallel.
+- **M2.5 — Phase 2A.5 complete**: New single-verb surface, `.trunnerrc` discovery, multi-workspace parallel execution with carousel view — `trunner plan` in a monorepo discovers and runs against every workspace in parallel.
 - **M3 — Phase 2B complete**: Smart version selection works end-to-end per workspace — `trunner plan` against a cold `~/.trunner` downloads and installs the right tool + providers for every discovered workspace in one shot.
 - **M4 — Phase 2C complete**: Desktop UI shell renders and consumes mock runners, mirroring the multi-workspace model in React.
 - **M5 — Phase 3A complete**: Production-grade CLI for Terraform workflows, wired to the real SDK (including the smart resolver and the management commands `trunner tools` / `trunner providers`).

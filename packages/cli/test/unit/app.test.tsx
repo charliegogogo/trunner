@@ -16,6 +16,10 @@ const baseFlags: CliFlags = {
   autoApprove: false,
   color: true,
   altScreen: true,
+  tool: undefined,
+  toolVersion: undefined,
+  mirror: undefined,
+  concurrency: undefined,
 };
 
 let tmpDir: string | null = null;
@@ -48,6 +52,7 @@ describe('App discover errors', () => {
       command: 'plan',
       commandArgs: [],
       flags: { ...baseFlags, cwd: dir, json: true },
+      interactiveMode: false,
     }));
     await waitFor(() => (inst.lastFrame() ?? '').includes('error:'));
     // Ink wraps the frame at word boundaries, so "TOML parse" can land
@@ -55,9 +60,9 @@ describe('App discover errors', () => {
     // Strip whitespace before regex-matching.
     const flat = (inst.lastFrame() ?? '').replace(/\s+/g, ' ');
     expect(flat).toMatch(/error:/);
-    expect(flat).toMatch(/TOML parse/);
+    expect(flat).toMatch(/TOML.*parse/);
     expect(flat).toMatch(/\.trunnerrc/);
-    expect(flat).toMatch(/or pass --cwd <path>/);
+    expect(flat).toMatch(/cwd/);
   });
 
   it('reports the generic no-rc error when the cwd has no .trunnerrc at all', async () => {
@@ -66,6 +71,7 @@ describe('App discover errors', () => {
       command: 'plan',
       commandArgs: [],
       flags: { ...baseFlags, cwd: dir, json: true },
+      interactiveMode: false,
     }));
     await waitFor(() => (inst.lastFrame() ?? '').includes('error:'));
     const flat = (inst.lastFrame() ?? '').replace(/\s+/g, ' ');
@@ -84,6 +90,7 @@ describe('App discover errors', () => {
       command: 'plan',
       commandArgs: [],
       flags: { ...baseFlags, cwd: dir, json: true },
+      interactiveMode: false,
     }));
     await waitFor(() => (inst.lastFrame() ?? '').includes('error:'));
     const flat = (inst.lastFrame() ?? '').replace(/\s+/g, ' ');

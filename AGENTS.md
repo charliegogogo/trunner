@@ -8,7 +8,7 @@ pnpm + TypeScript monorepo. POC scope is **Terraform only** — OpenTofu is a pl
 
 **Status**: Phase 1 ✅, Phase 2A ✅ (CLI TUI shell + Node SEA pipeline), Phase 2A.5 + 2B in design (single-verb surface + `.trunnerrc` + multi-workspace parallel execution + smart version selection in the SDK). `@trunner/sdk` 53/53 unit + 1/1 integration; `@trunner/cli` 14/14. `packages/desktop` is not created yet.
 
-**CLI shape**: single-verb, tool-as-config — `trunner plan`, not `trunner terraform plan`. Tool is set by `.trunnerrc` (per-workspace TOML) or `-t` on the command line. `trunner <command>` discovers all `.trunnerrc` workspaces under cwd and runs the command against each in parallel, with a Claude-Code-style status bar. See PLAN.md §4.8 / §4.9 / §5.1 and gotchas 16–19.
+**CLI shape**: single-verb, tool-as-config — `trunner plan`, not `trunner terraform plan`. Tool is set by `.trunnerrc` (per-workspace TOML) or `-t` on the command line. `trunner <command>` discovers all `.trunnerrc` workspaces under cwd and runs the command against each in parallel, with a Claude-Code-style carousel view. See PLAN.md §4.8 / §4.9 / §5.1 and gotchas 16–19.
 
 ## Layout
 
@@ -49,10 +49,12 @@ trunner/
     └── cli/                     # Phase 2A done; 2A.5 rewrites the surface
         ├── src/
         │   ├── trunner.tsx      # entry (single-verb parsing, global flags)
-        │   ├── app.tsx          # discover + runWorkspaces + StatusBar
-        │   ├── ui/              # StatusBar, WorkspacePane, Spinner, ProgressBar,
+        │   ├── app.tsx          # discover + runWorkspaces + ExecutionView
+        │   ├── ui/              # ExecutionView, InteractiveWizard, QuietMode,
+        │   │                    # WorkspaceOutput, Spinner, ProgressBar,
         │   │                    # Confirm, OutputView
-        │   ├── hooks/           # useWorkspaces (multi-stream), useRunner (single)
+        │   ├── hooks/           # useWorkspaces (multi-stream), useRunner (single),
+        │   │                    # useTerminalSize (live resize detection)
         │   └── commands/        # tools, providers (Phase 2A.5 keeps the layout)
         ├── scripts/
         │   ├── build-sea.sh     # macOS/Linux
@@ -205,7 +207,7 @@ Smart resolve always `GET`s `https://registry.terraform.io/.well-known/terraform
 
 ### 18. Multi-workspace runs are concurrent, not pipelined (Phase 2A.5)
 
-When N workspaces are discovered, trunner runs the user's command against each in parallel up to a worker-pool cap of `os.cpus().length` (overridable via `.trunnerrc` `concurrency` or CLI `--concurrency`). Output streams are multiplexed through a single `AsyncIterable<WorkspaceEvent>`; the CLI's `useWorkspaces` hook routes each event to the right workspace's slot in the `StatusBar`. A failed workspace does **not** abort the others — all run to completion, the final summary lists per-workspace exit codes, and the overall process exit code is `0` iff all succeeded. See PLAN.md §4.9.
+When N workspaces are discovered, trunner runs the user's command against each in parallel up to a worker-pool cap of `os.cpus().length` (overridable via `.trunnerrc` `concurrency` or CLI `--concurrency`). Output streams are multiplexed through a single `AsyncIterable<WorkspaceEvent>`; the CLI's `useWorkspaces` hook routes each event to the right workspace's slot in the `ExecutionView`. A failed workspace does **not** abort the others — all run to completion, the final summary lists per-workspace exit codes, and the overall process exit code is `0` iff all succeeded. See PLAN.md §4.9.
 
 ### 19. `trunner tools` and `trunner providers` are the management commands (Phase 2A.5)
 

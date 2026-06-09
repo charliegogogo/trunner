@@ -14,7 +14,7 @@ The POC targets **Terraform only**; the architecture is designed so OpenTofu can
 | --- | --- | --- |
 | **Phase 1** | `@trunner/sdk` — Tool abstraction, runner, installer, Terraform implementation | ✅ Complete (full `init/plan/apply/destroy` cycle against a real Terraform binary) |
 | **Phase 2A** | CLI TUI shell (React Ink) + Node.js SEA pipeline (single-file native binary) | ✅ Complete (139 MB `dist/trunner` per platform) |
-| **Phase 2A.5** | Single-verb surface + `.trunnerrc` discovery + multi-workspace parallel execution + Claude-Code-style status bar | ⏳ Planned |
+| **Phase 2A.5** | Single-verb surface + `.trunnerrc` discovery + multi-workspace parallel execution + Claude-Code-style carousel view | ✅ Complete |
 | **Phase 2B** | Smart binary + provider version selection in the SDK (`tool.resolveAll`) | ⏳ Planned |
 | **Phase 2C** | Desktop UI shell (Electron + Vite + React + Tailwind + Zustand) | ⏳ Planned |
 | **Phase 3A** | CLI features (real SDK wiring + `.trunner` config + SEA-packaged executables) | ⏳ Planned |
@@ -68,7 +68,7 @@ trunner/
     │   ├── test/unit/         # Unit tests
     │   ├── test/integration/  # Full Terraform lifecycle test
     │   └── README.md          # SDK-level usage guide
-    ├── cli/                   # (Phase 2A ✅, 2A.5 ⏳) React Ink + meow, packaged as SEA
+    ├── cli/                   # (Phase 2A ✅, 2A.5 ✅) React Ink + meow, packaged as SEA
     └── desktop/               # (Phase 2C ⏳) Electron + Vite + React + Tailwind + Zustand
 ```
 

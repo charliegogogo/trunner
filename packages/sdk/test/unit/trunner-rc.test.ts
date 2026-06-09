@@ -43,6 +43,7 @@ describe('workspace/trunner-rc', () => {
         'version = "~> 1.6"',
         'concurrency = 4',
         'exclude = ["vendor", "build"]',
+        'command = "apply"',
       ].join('\n'),
     );
     const { config, warnings } = await parseRc(path);
@@ -50,6 +51,7 @@ describe('workspace/trunner-rc', () => {
     expect(config.version).toBe('~> 1.6');
     expect(config.concurrency).toBe(4);
     expect(config.exclude).toEqual(['vendor', 'build']);
+    expect(config.command).toBe('apply');
     expect(warnings).toEqual([]);
   });
 

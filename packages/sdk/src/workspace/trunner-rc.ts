@@ -16,6 +16,8 @@ export interface TrunnerRc {
   readonly concurrency?: number;
   /** Optional extra dirs to skip during the recursive scan. */
   readonly exclude?: readonly string[];
+  /** Optional default command for interactive mode (e.g. "plan", "apply"). */
+  readonly command?: string;
 }
 
 export interface ParseRcWarning {
@@ -28,7 +30,7 @@ export interface ParseRcResult {
   warnings: ParseRcWarning[];
 }
 
-const KNOWN_KEYS: ReadonlySet<string> = new Set(['tool', 'version', 'concurrency', 'exclude']);
+const KNOWN_KEYS: ReadonlySet<string> = new Set(['tool', 'version', 'concurrency', 'exclude', 'command']);
 
 const TOOL_ALIASES: Record<string, ToolId> = {
   terraform: 'terraform',
@@ -112,12 +114,21 @@ export async function parseRc(path: string): Promise<ParseRcResult> {
     exclude = parsed.exclude as string[];
   }
 
+  let command: string | undefined;
+  if (parsed.command !== undefined) {
+    if (typeof parsed.command !== 'string' || parsed.command.length === 0) {
+      throw new RcParseError(`invalid value for 'command': expected non-empty string, got ${typeof parsed.command}`, path);
+    }
+    command = parsed.command;
+  }
+
   const config: TrunnerRc = {
     path,
     tool: toolResolved,
     ...(version !== undefined ? { version } : {}),
     ...(concurrency !== undefined ? { concurrency } : {}),
     ...(exclude !== undefined ? { exclude } : {}),
+    ...(command !== undefined ? { command } : {}),
   };
 
   return { config, warnings };

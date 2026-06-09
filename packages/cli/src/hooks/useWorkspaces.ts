@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { parsePlanAndApplyOutput } from '@trunner/sdk';
 import type {
   ProgressInfo,
   PromptRequest,
@@ -6,6 +7,7 @@ import type {
   TrunnerRc,
   WorkspaceEvent,
   RunSummary,
+  ParsedSummary,
 } from '@trunner/sdk';
 
 export type WorkspaceState = 'pending' | 'resolving' | 'running' | 'exited';
@@ -26,6 +28,7 @@ export interface WorkspaceDisplay {
   exitSignal: NodeJS.Signals | null;
   startedAt: number;
   endedAt: number | null;
+  parsedResult: ParsedSummary | null;
 }
 
 export interface UseWorkspacesResult {
@@ -58,6 +61,7 @@ function initial(dir: string, config: TrunnerRc): WorkspaceDisplay {
     exitSignal: null,
     startedAt: Date.now(),
     endedAt: null,
+    parsedResult: null,
   };
 }
 
@@ -150,18 +154,19 @@ export function useWorkspaces(
             );
           } else if (e.kind === 'exited') {
             setWorkspaces((prev) =>
-              prev.map((w) =>
-                w.dir === e.workspace.dir
-                  ? {
-                      ...w,
-                      state: 'exited',
-                      exitCode: e.code,
-                      exitSignal: e.signal,
-                      endedAt: Date.now(),
-                      prompt: null,
-                    }
-                  : w,
-              ),
+              prev.map((w) => {
+                if (w.dir !== e.workspace.dir) return w;
+                const parsedResult = parsePlanAndApplyOutput(w.stdout, w.stderr, { includeDiagnostics: e.code !== 0 });
+                return {
+                  ...w,
+                  state: 'exited',
+                  exitCode: e.code,
+                  exitSignal: e.signal,
+                  endedAt: Date.now(),
+                  prompt: null,
+                  parsedResult,
+                };
+              }),
             );
             promptAnswersRef.current.delete(e.workspace.dir);
           } else if (e.kind === 'done') {
