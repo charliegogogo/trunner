@@ -1,7 +1,7 @@
 {
   "name": "@trunner/cli",
   "version": "0.1.0",
-  "description": "Cross-platform CLI for trunner (Ink TUI).",
+  "description": "Cross-platform CLI for Terraform / OpenTofu.",
   "license": "MIT",
   "type": "module",
   "bin": {

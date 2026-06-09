@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { TrunnerRc } from '@trunner/sdk';
+import { Banner } from './Banner.js';
 
 export interface InteractiveWizardProps {
   onComplete: (result: { command: string; tool: string }) => void;
@@ -72,10 +73,7 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Box marginBottom={1}>
-        <Text bold>trunner</Text>
-        <Text dimColor> · interactive mode</Text>
-      </Box>
+      <Banner />
 
       {step === 'command' && (
         <Box flexDirection="column">
@@ -108,7 +106,7 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
             </Text>
           ))}
           <Box marginTop={1}>
-            <Text dimColor>Press <Text bold>Enter</Text> to confirm, <Text bold>↑/↓</Text> or <Text bold>j/k</Text> to navigate</Text>
+            <Text dimColor>Press <Text bold>Enter</Text> to confirm, <Text bold>↑/↓</Text> to navigate</Text>
           </Box>
         </Box>
       )}
