@@ -115,10 +115,9 @@ async function main(): Promise<void> {
   }
 
   // Non-interactive mode: run a tool command across all discovered workspaces.
-  // Use alternate screen for proper resize handling.
+  // Disable alternate screen for non-interactive mode to keep output in scrollback.
   const flags: CliFlags = parseFlags(cli);
   const interactive = process.stdout.isTTY !== false;
-  const alternateScreen = flags.altScreen && interactive;
   const app = render(
     React.createElement(App, {
       command: verb,
@@ -129,11 +128,11 @@ async function main(): Promise<void> {
     }),
     {
       ...(interactive ? { interactive: true } : {}),
-      ...(alternateScreen ? { alternateScreen: true } : {}),
+      // Non-interactive mode: never use alternate screen
     },
   );
   await app.waitUntilExit();
-  // Print results after Ink exits (alternate screen is restored)
+  // Print results after Ink exits
   if (exitResults) {
     process.stdout.write(exitResults + '\n');
     exitResults = null;

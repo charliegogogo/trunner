@@ -14,6 +14,7 @@ import {
 import { useWorkspaces, type WorkspaceDisplay } from './hooks/useWorkspaces.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ExecutionView } from './ui/ExecutionView.js';
+import { StreamView } from './ui/StreamView.js';
 import { InteractiveWizard, type InteractiveWizardResult } from './ui/InteractiveWizard.js';
 import { ManagementView } from './ui/ManagementView.js';
 import type { CliFlags } from './types.js';
@@ -275,8 +276,6 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     };
   }, [command, commandArgs, flags.cwd, flags.exclude, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
 
-  const keepAlive = process.env['TR_KEEP_ALIVE'] !== '0';
-
   useInput(
     (_input, key) => {
       // Exit on Esc
@@ -289,7 +288,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         ink.exit();
       }
 
-      // Tab switching with arrow keys
+      // Tab switching with arrow keys (for interactive mode's recursive call)
       if (state.phase === 'running' || state.phase === 'done') {
         if (key.leftArrow) {
           // Previous workspace
@@ -317,25 +316,23 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   useEffect(() => {
     if (state.phase === 'error') {
       process.exitCode = 1;
-      if (!keepAlive) {
-        const t = setTimeout(() => {
-          onExit?.(`error: ${state.error}`);
-          ink.exit();
-        }, 2000);
-        return () => clearTimeout(t);
-      }
+      // Non-interactive mode: auto-exit after error
+      const t = setTimeout(() => {
+        onExit?.(`error: ${state.error}`);
+        ink.exit();
+      }, 2000);
+      return () => clearTimeout(t);
     } else if (state.phase === 'done') {
       const s = summary ?? state.summary;
       process.exitCode = s && s.failed > 0 ? 1 : 0;
-      if (!keepAlive) {
-        const t = setTimeout(() => {
-          onExit?.(formatResults(workspaces, summary ?? state.summary, command));
-          ink.exit();
-        }, 1000);
-        return () => clearTimeout(t);
-      }
+      // Non-interactive mode: auto-exit after completion
+      const t = setTimeout(() => {
+        onExit?.(formatResults(workspaces, summary ?? state.summary, command));
+        ink.exit();
+      }, 1000);
+      return () => clearTimeout(t);
     }
-  }, [state.phase, state.summary, summary, ink, keepAlive, workspaces, onExit]);
+  }, [state.phase, state.summary, summary, ink, workspaces, onExit]);
 
   if (state.phase === 'error') {
     return (
@@ -348,44 +345,25 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         >
           <Text color="red">error: {state.error}</Text>
         </Box>
-        {keepAlive && (
-          <Box
-            borderStyle="round"
-            borderColor="magenta"
-            paddingX={1}
-            width={termWidth}
-            marginTop={1}
-          >
-            <Text dimColor>Press Esc to exit</Text>
-          </Box>
-        )}
       </Box>
     );
   }
 
   if (state.phase === 'discovering') {
     return (
-      <Box flexDirection="column" width={termWidth} height={termHeight}>
-        <Box
-          borderStyle="round"
-          borderColor="magenta"
-          paddingX={1}
-          width={termWidth}
-        >
-          <Text bold color="magenta">trunner</Text>
-          <Text dimColor> │ </Text>
-          <Text dimColor>discovering workspaces...</Text>
-        </Box>
+      <Box flexDirection="column" width={termWidth}>
+        <Text dimColor> discovering workspaces...</Text>
       </Box>
     );
   }
 
-  // Show ExecutionView for both running and done phases (carousel view)
+  // Show StreamView for both running and done phases (streaming output with prefixes)
   return (
-    <ExecutionView
+    <StreamView
       workspaces={workspaces}
-      focusedIndex={focusedIndex}
-      scrollOffset={scrollOffset}
+      cwd={flags.cwd}
+      command={command}
+      summary={summary ?? state.summary}
       isComplete={state.phase === 'done'}
       width={termWidth}
       height={termHeight}
