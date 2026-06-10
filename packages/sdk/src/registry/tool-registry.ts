@@ -1,5 +1,6 @@
 import type { Tool, ToolId } from '../types/tool.js';
 import { TerraformTool } from '../tools/terraform/index.js';
+import { OpenTofuTool } from '../tools/opentofu/index.js';
 
 export type ToolFactory = () => Tool;
 
@@ -50,4 +51,5 @@ export function createDefaultRegistry(): ToolRegistry {
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register('terraform', () => new TerraformTool());
+  reg.register('opentofu', () => new OpenTofuTool());
 }

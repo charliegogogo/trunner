@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { TrunnerRc } from '@trunner/sdk';
 import { Banner } from './Banner.js';
@@ -13,9 +13,9 @@ export interface InteractiveWizardResult {
 export interface InteractiveWizardProps {
   onComplete: (result: InteractiveWizardResult) => void;
   defaultRc: TrunnerRc | null;
+  detectedTool: 'terraform' | 'opentofu' | 'mixed' | null;
 }
 
-const TOOLS = ['terraform', 'opentofu'] as const;
 const RUN_COMMANDS = ['plan', 'apply', 'destroy'] as const;
 const MANAGE_OPTIONS = ['tools', 'providers'] as const;
 
@@ -31,25 +31,47 @@ const ALL_OPTIONS = [
 
 type Step = 'tool' | 'command';
 
-export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardProps): React.ReactElement {
+export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: InteractiveWizardProps): React.ReactElement {
   const [step, setStep] = useState<Step>('tool');
-  const [selectedTool, setSelectedTool] = useState<string>(
-    defaultRc?.tool && TOOLS.includes(defaultRc.tool as any) ? defaultRc.tool : TOOLS[0]
-  );
+  const [selectedTool, setSelectedTool] = useState<string>('terraform');
   const [selectedIndex, setSelectedIndex] = useState<number>(
     defaultRc?.command
       ? Math.max(0, ALL_OPTIONS.findIndex((o) => o.command === defaultRc.command))
       : 0
   );
-
-  const [toolIndex, setToolIndex] = useState<number>(
-    defaultRc?.tool && TOOLS.includes(defaultRc.tool) ? TOOLS.indexOf(defaultRc.tool as any) : 0
-  );
+  const [toolIndex, setToolIndex] = useState<number>(0);
 
   const selectedOption = ALL_OPTIONS[selectedIndex]!;
 
+  // Sync toolIndex/selectedTool when defaultRc loads asynchronously
+  useEffect(() => {
+    if (step !== 'tool') return;
+
+    // Priority: defaultRc > detectedTool
+    if (defaultRc?.tool) {
+      const tools = getToolOptions(detectedTool);
+      const idx = tools.indexOf(defaultRc.tool);
+      if (idx >= 0) {
+        setToolIndex(idx);
+        setSelectedTool(defaultRc.tool);
+      }
+    } else if (detectedTool && detectedTool !== 'mixed') {
+      setToolIndex(0);
+      setSelectedTool(detectedTool);
+    } else if (detectedTool === 'mixed') {
+      const tools = getToolOptions(detectedTool);
+      const idx = tools.indexOf('mixed');
+      if (idx >= 0) {
+        setToolIndex(idx);
+        setSelectedTool('mixed');
+      }
+    }
+  }, [defaultRc?.tool, detectedTool, step]);
+
   const handleInput = useCallback(
     (input: string, key: { return: boolean; upArrow: boolean; downArrow: boolean }) => {
+      const tools = getToolOptions(detectedTool);
+
       if (key.return) {
         if (step === 'tool') {
           setStep('command');
@@ -72,11 +94,11 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
         if (key.upArrow) {
           const newIndex = Math.max(0, toolIndex - 1);
           setToolIndex(newIndex);
-          setSelectedTool(TOOLS[newIndex]!);
+          setSelectedTool(tools[newIndex]!);
         } else if (key.downArrow) {
-          const newIndex = Math.min(TOOLS.length - 1, toolIndex + 1);
+          const newIndex = Math.min(tools.length - 1, toolIndex + 1);
           setToolIndex(newIndex);
-          setSelectedTool(TOOLS[newIndex]!);
+          setSelectedTool(tools[newIndex]!);
         }
       } else if (step === 'command') {
         if (key.upArrow) {
@@ -86,10 +108,12 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
         }
       }
     },
-    [step, toolIndex, selectedOption, selectedTool, onComplete],
+    [step, toolIndex, selectedOption, selectedTool, onComplete, detectedTool],
   );
 
   useInput(handleInput, { isActive: true });
+
+  const tools = getToolOptions(detectedTool);
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -98,12 +122,15 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
       {step === 'tool' && (
         <Box flexDirection="column">
           <Text bold>Select tool:</Text>
-          {TOOLS.map((tool, i) => (
+          {tools.map((tool, i) => (
             <Text key={tool}>
               {i === toolIndex ? <Text color="green">▶ </Text> : <Text>  </Text>}
               {i === toolIndex ? <Text bold>{tool}</Text> : <Text dimColor>{tool}</Text>}
               {i === toolIndex && tool === selectedTool && defaultRc?.tool === tool && (
                 <Text dimColor> (default from .trunnerrc)</Text>
+              )}
+              {i === toolIndex && tool === 'mixed' && detectedTool === 'mixed' && (
+                <Text dimColor> (multiple tools detected)</Text>
               )}
             </Text>
           ))}
@@ -157,4 +184,11 @@ export function InteractiveWizard({ onComplete, defaultRc }: InteractiveWizardPr
       )}
     </Box>
   );
+}
+
+function getToolOptions(detectedTool: 'terraform' | 'opentofu' | 'mixed' | null): readonly string[] {
+  if (detectedTool === 'mixed') {
+    return ['terraform', 'opentofu', 'mixed'] as const;
+  }
+  return ['terraform', 'opentofu'] as const;
 }

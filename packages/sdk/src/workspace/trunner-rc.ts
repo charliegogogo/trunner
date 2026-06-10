@@ -8,7 +8,7 @@ export const TRUNNERRC_FILENAME = '.trunnerrc';
 export interface TrunnerRc {
   /** Absolute path to the .trunnerrc file. */
   readonly path: string;
-  /** The tool to use for this workspace. */
+  /** The tool to use for this workspace. Defaults to 'terraform' if not specified. */
   readonly tool: ToolId;
   /** Optional tool binary version constraint (e.g. "~> 1.6"). */
   readonly version?: string;
@@ -73,15 +73,19 @@ export async function parseRc(path: string): Promise<ParseRcResult> {
   }
 
   const toolRaw = parsed.tool;
-  if (typeof toolRaw !== 'string' || toolRaw.length === 0) {
-    throw new RcParseError("missing required field 'tool'", path);
-  }
-  const toolResolved = TOOL_ALIASES[toolRaw];
-  if (!toolResolved || !VALID_TOOLS.has(toolResolved)) {
-    throw new RcParseError(
-      `invalid value for 'tool': ${JSON.stringify(toolRaw)} (expected: terraform | opentofu | tofu)`,
-      path,
-    );
+  let toolResolved: ToolId = 'terraform'; // default
+  if (toolRaw !== undefined) {
+    if (typeof toolRaw !== 'string' || toolRaw.length === 0) {
+      throw new RcParseError(`invalid value for 'tool': expected non-empty string`, path);
+    }
+    const resolved = TOOL_ALIASES[toolRaw];
+    if (!resolved || !VALID_TOOLS.has(resolved)) {
+      throw new RcParseError(
+        `invalid value for 'tool': ${JSON.stringify(toolRaw)} (expected: terraform | opentofu | tofu)`,
+        path,
+      );
+    }
+    toolResolved = resolved;
   }
 
   let version: string | undefined;

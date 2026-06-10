@@ -105,6 +105,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   const [selectedCommand, setSelectedCommand] = useState<string | null>(null);
   const [interactiveCategory, setInteractiveCategory] = useState<'run' | 'manage' | null>(null);
   const [managementTarget, setManagementTarget] = useState<'tools' | 'providers' | null>(null);
+  const [detectedTool, setDetectedTool] = useState<'terraform' | 'opentofu' | 'mixed' | null>(null);
 
   useEffect(() => {
     if (!interactiveMode) return;
@@ -120,14 +121,30 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       } catch {
         setDefaultRc(null);
       }
+
+      // Scan all subdirectories to detect mixed tools
+      try {
+        const workspaces = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+        const tools = new Set(workspaces.map((ws) => ws.config.tool));
+        if (tools.size > 1) {
+          setDetectedTool('mixed');
+        } else if (tools.size === 1) {
+          const tool = workspaces[0]?.config.tool;
+          setDetectedTool(tool ?? 'terraform');
+        } else {
+          setDetectedTool('terraform');
+        }
+      } catch {
+        setDetectedTool('terraform');
+      }
     })();
-  }, [interactiveMode, flags.cwd]);
+  }, [interactiveMode, flags.cwd, flags.exclude]);
 
   const { width: termWidth, height: termHeight } = useTerminalSize();
 
   if (interactiveMode) {
-    // Show ManagementView if in manage category
-    if (interactiveCategory === 'manage' && managementTarget && selectedTool) {
+    // Show ManagementView if in manage category (not for "mixed")
+    if (interactiveCategory === 'manage' && managementTarget && selectedTool && selectedTool !== 'mixed') {
       return (
         <ManagementView
           tool={selectedTool}
@@ -145,11 +162,13 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
 
     // Show ExecutionView if in run category with command selected
     if (interactiveCategory === 'run' && selectedCommand && selectedTool) {
+      // When "mixed" is selected, don't pass tool override - let each workspace use its own tool
+      const toolOverride = selectedTool === 'mixed' ? undefined : selectedTool;
       return (
         <App
           command={selectedCommand}
           commandArgs={commandArgs}
-          flags={{ ...flags, tool: selectedTool }}
+          flags={{ ...flags, ...(toolOverride ? { tool: toolOverride } : {}) }}
           interactiveMode={false}
           onExit={onExit}
         />
@@ -160,6 +179,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     return (
       <InteractiveWizard
         defaultRc={defaultRc}
+        detectedTool={detectedTool}
         onComplete={(result: InteractiveWizardResult) => {
           setSelectedTool(result.tool);
           setInteractiveCategory(result.category);

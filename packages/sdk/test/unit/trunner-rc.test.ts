@@ -61,10 +61,10 @@ describe('workspace/trunner-rc', () => {
     expect(config.tool).toBe('opentofu');
   });
 
-  it('throws RcParseError when the tool field is missing', async () => {
+  it('defaults tool to terraform when the tool field is missing', async () => {
     const path = await writeRc('d', 'version = "~> 1.5"\n');
-    await expect(parseRc(path)).rejects.toBeInstanceOf(RcParseError);
-    await expect(parseRc(path)).rejects.toThrow(/missing required field 'tool'/);
+    const { config } = await parseRc(path);
+    expect(config.tool).toBe('terraform');
   });
 
   it('throws RcParseError when the tool value is invalid', async () => {

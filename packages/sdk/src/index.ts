@@ -17,6 +17,12 @@ export { TerraformProviderManager, TerraformProviderSource, parseLockFileString,
 export { TerraformReleaseSource } from './tools/terraform/release-source.js';
 export { terraformCommands } from './tools/terraform/commands.js';
 
+export { OpenTofuTool } from './tools/opentofu/index.js';
+export { OpenTofuBinaryManager } from './tools/opentofu/binary.js';
+export { OpenTofuProviderManager, OpenTofuProviderSource } from './tools/opentofu/provider.js';
+export { OpenTofuReleaseSource } from './tools/opentofu/release-source.js';
+export { opentofuCommands } from './tools/opentofu/commands.js';
+
 export { BaseTool } from './tools/base/base-tool.js';
 export { BaseBinaryManager } from './tools/base/base-binary-manager.js';
 export { BaseProviderManager } from './tools/base/base-provider-manager.js';

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { RunnerStream, type Runner } from './stream.js';
 import { parsePlanAndApplyOutput } from './parser.js';
 import type { CommandResult } from '../types/result.js';
@@ -75,6 +76,12 @@ async function runCommand(spec: RunSpec, opts: InternalOptions): Promise<Command
   inflight.add(ac);
 
   const env = buildEnv(spec, opts);
+  // Ensure plugin cache directory exists before spawning terraform
+  try {
+    mkdirSync(env.TF_PLUGIN_CACHE_DIR!, { recursive: true });
+  } catch {
+    // Ignore errors if directory already exists or cannot be created
+  }
   logger.debug('spawning', { binary: spec.binaryPath, args: spec.args, cwd: spec.cwd });
 
   let child: ChildProcess;
