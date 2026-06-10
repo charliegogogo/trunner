@@ -4,6 +4,7 @@ import React from 'react';
 import { App } from './app.js';
 import { renderToolsCommand } from './commands/tools.js';
 import { renderProvidersCommand } from './commands/providers.js';
+import { discoverWorkspaces, runWorkspaces } from '@trunner/sdk';
 import type { CliFlags, CliSubcommand } from './types.js';
 
 const cli = meow(
@@ -115,8 +116,15 @@ async function main(): Promise<void> {
   }
 
   // Non-interactive mode: run a tool command across all discovered workspaces.
-  // Disable alternate screen for non-interactive mode to keep output in scrollback.
   const flags: CliFlags = parseFlags(cli);
+
+  // JSON mode: emit one JSON line per workspace event (no TUI)
+  if (flags.json) {
+    await runJsonMode(verb, subArgs, flags);
+    return;
+  }
+
+  // Normal mode: use Ink for TUI rendering
   const interactive = process.stdout.isTTY !== false;
   const app = render(
     React.createElement(App, {
@@ -137,6 +145,66 @@ async function main(): Promise<void> {
     process.stdout.write(exitResults + '\n');
     exitResults = null;
   }
+}
+
+/**
+ * JSON mode: emit one JSON line per workspace event.
+ * No TUI, no Ink rendering — just JSON Lines to stdout.
+ * Ideal for CI/CD pipelines and AI agent consumption.
+ */
+async function runJsonMode(command: string, args: string[], flags: CliFlags): Promise<void> {
+  const workspaces = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+
+  if (workspaces.length === 0) {
+    const msg = `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
+    process.stderr.write(JSON.stringify({ kind: 'error', message: msg }) + '\n');
+    process.exit(1);
+  }
+
+  const iter = runWorkspaces(workspaces, command, args, {
+    ...(typeof flags.concurrency === 'number' ? { concurrency: flags.concurrency } : {}),
+    ...(flags.toolVersion ? { toolVersionRef: flags.toolVersion } : {}),
+    ...(flags.tool ? { toolOverride: flags.tool } : {}),
+    autoApprove: flags.autoApprove,
+  });
+
+  for await (const event of iter) {
+    // Serialize the event to JSON, handling Map in summary
+    const serialized = serializeEvent(event);
+    process.stdout.write(JSON.stringify(serialized) + '\n');
+  }
+}
+
+/**
+ * Serialize a WorkspaceEvent to a plain object for JSON serialization.
+ * Handles special types like Map and function references.
+ */
+function serializeEvent(event: import('@trunner/sdk').WorkspaceEvent): Record<string, unknown> {
+  if (event.kind === 'done') {
+    return {
+      kind: 'done',
+      summary: {
+        total: event.summary.total,
+        succeeded: event.summary.succeeded,
+        failed: event.summary.failed,
+        workspaces: Object.fromEntries(event.summary.workspaces),
+      },
+    };
+  }
+
+  // For events with workspace, include dir and config
+  if ('workspace' in event) {
+    const { workspace, ...rest } = event;
+    return {
+      ...rest,
+      workspace: {
+        dir: workspace.dir,
+        config: workspace.config,
+      },
+    };
+  }
+
+  return event as unknown as Record<string, unknown>;
 }
 
 function detectSubcommand(verb: string | undefined): CliSubcommand | null {
