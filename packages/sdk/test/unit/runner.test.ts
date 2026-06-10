@@ -5,8 +5,8 @@ import { mkdir, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import type { ChildProcess } from 'node:child_process';
-import { runWorkspaces, type WorkspaceEvent, type RunSummary } from '../../src/workspace/runner.js';
-import { discoverWorkspaces } from '../../src/workspace/discover.js';
+import { runWorkingDirs, type WorkingDirEvent, type RunSummary } from '../../src/working-dir/runner.js';
+import { discoverWorkingDirs } from '../../src/working-dir/discover.js';
 import { getPaths, type TrunnerPaths } from '../../src/env/paths.js';
 import { getPlatformInfo } from '../../src/utils/os.js';
 import { BaseBinaryManager } from '../../src/tools/base/base-binary-manager.js';
@@ -108,17 +108,17 @@ async function mkMonorepo(names: string[]): Promise<string> {
 }
 
 interface CollectedRun {
-  events: WorkspaceEvent[];
+  events: WorkingDirEvent[];
   startedPromise: Promise<void>;
   resolveStarted: () => void;
   consumer: Promise<void>;
 }
 
 async function runAndCollect(
-  iter: AsyncIterable<WorkspaceEvent>,
+  iter: AsyncIterable<WorkingDirEvent>,
   expectedStarts: number,
 ): Promise<CollectedRun> {
-  const events: WorkspaceEvent[] = [];
+  const events: WorkingDirEvent[] = [];
   let resolveStarted!: () => void;
   const startedPromise = new Promise<void>((r) => { resolveStarted = r; });
   let startedSeen = 0;
@@ -145,19 +145,19 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-describe('workspace/runner', () => {
-  it('emits started → stdout/stderr → exited → done for a single workspace', async () => {
+describe('working-dir/runner', () => {
+  it('emits started → stdout/stderr → exited → done for a single working directory', async () => {
     useFakeTool(['1.6.6']);
 
     const fake = makeFakeChild();
     spawnMock.mockReturnValue(fake.child);
 
     const monoRoot = await mkMonorepo(['alpha']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
     expect(ws).toHaveLength(1);
 
     const { events, startedPromise, consumer } = await runAndCollect(
-      runWorkspaces(ws, 'plan', []),
+      runWorkingDirs(ws, 'plan', []),
       1,
     );
     await startedPromise;
@@ -182,7 +182,7 @@ describe('workspace/runner', () => {
     }
   });
 
-  it('runs multiple workspaces in parallel (concurrency = 3)', async () => {
+  it('runs multiple working directories in parallel (concurrency = 3)', async () => {
     useFakeTool(['1.6.6']);
 
     const fakes = [makeFakeChild(), makeFakeChild(), makeFakeChild()];
@@ -190,10 +190,10 @@ describe('workspace/runner', () => {
     spawnMock.mockImplementation(() => fakes[callIdx++]!.child);
 
     const monoRoot = await mkMonorepo(['a', 'b', 'c']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
 
     const { events, startedPromise, consumer } = await runAndCollect(
-      runWorkspaces(ws, 'plan', [], { concurrency: 3 }),
+      runWorkingDirs(ws, 'plan', [], { concurrency: 3 }),
       3,
     );
     await startedPromise;
@@ -220,10 +220,10 @@ describe('workspace/runner', () => {
     spawnMock.mockImplementation(() => fakes[callIdx++]!.child);
 
     const monoRoot = await mkMonorepo(['one', 'two']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
 
-    const iter = runWorkspaces(ws, 'plan', [], { concurrency: 1 });
-    const events: WorkspaceEvent[] = [];
+    const iter = runWorkingDirs(ws, 'plan', [], { concurrency: 1 });
+    const events: WorkingDirEvent[] = [];
     const startOrder: string[] = [];
     const exitOrder: string[] = [];
     let fakeIdx = 0;
@@ -232,12 +232,12 @@ describe('workspace/runner', () => {
       for await (const e of iter) {
         events.push(e);
         if (e.kind === 'started') {
-          startOrder.push(basename(e.workspace.dir));
+          startOrder.push(basename(e.workingDir.dir));
           // Close the next fake after the worker has registered listeners
-          // on it (spawn happens AFTER the started push, in runOneWorkspace).
+          // on it (spawn happens AFTER the started push, in runOneWorkingDir).
           setTimeout(() => fakes[fakeIdx++]!.closeWith(0), 0);
         } else if (e.kind === 'exited') {
-          exitOrder.push(basename(e.workspace.dir));
+          exitOrder.push(basename(e.workingDir.dir));
         }
       }
     })();
@@ -247,7 +247,7 @@ describe('workspace/runner', () => {
     expect(exitOrder).toEqual(['one', 'two']);
   });
 
-  it('a failed workspace does not abort siblings', async () => {
+  it('a failed working directory does not abort siblings', async () => {
     useFakeTool(['1.6.6']);
 
     const fakes = [makeFakeChild(), makeFakeChild()];
@@ -255,10 +255,10 @@ describe('workspace/runner', () => {
     spawnMock.mockImplementation(() => fakes[callIdx++]!.child);
 
     const monoRoot = await mkMonorepo(['fail', 'pass']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
 
     const { events, startedPromise, consumer } = await runAndCollect(
-      runWorkspaces(ws, 'plan', [], { concurrency: 2 }),
+      runWorkingDirs(ws, 'plan', [], { concurrency: 2 }),
       2,
     );
     await startedPromise;
@@ -275,7 +275,7 @@ describe('workspace/runner', () => {
     }
   });
 
-  it('reports per-workspace exit codes in the final done event', async () => {
+  it('reports per-working-directory exit codes in the final done event', async () => {
     useFakeTool(['1.6.6']);
 
     const fakes = [makeFakeChild(), makeFakeChild(), makeFakeChild()];
@@ -283,10 +283,10 @@ describe('workspace/runner', () => {
     spawnMock.mockImplementation(() => fakes[callIdx++]!.child);
 
     const monoRoot = await mkMonorepo(['x', 'y', 'z']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
 
     const { events, startedPromise, consumer } = await runAndCollect(
-      runWorkspaces(ws, 'plan', [], { concurrency: 3 }),
+      runWorkingDirs(ws, 'plan', [], { concurrency: 3 }),
       3,
     );
     await startedPromise;
@@ -297,7 +297,7 @@ describe('workspace/runner', () => {
 
     const done = events.find((e) => e.kind === 'done');
     if (!done || done.kind !== 'done') throw new Error('no done event');
-    const codes = [...done.summary.workspaces.entries()]
+    const codes = [...done.summary.workingDirs.entries()]
       .map(([dir, code]) => [basename(dir), code] as const)
       .sort((a, b) => a[0].localeCompare(b[0]));
     expect(codes).toEqual([['x', 0], ['y', 7], ['z', 0]]);
@@ -307,13 +307,13 @@ describe('workspace/runner', () => {
     useFakeTool([]);
 
     const monoRoot = await mkMonorepo(['empty']);
-    const ws = await discoverWorkspaces(monoRoot);
-    const events: WorkspaceEvent[] = [];
-    for await (const e of runWorkspaces(ws, 'plan', [])) {
+    const ws = await discoverWorkingDirs(monoRoot);
+    const events: WorkingDirEvent[] = [];
+    for await (const e of runWorkingDirs(ws, 'plan', [])) {
       events.push(e);
     }
     const stderr = events
-      .filter((e): e is Extract<WorkspaceEvent, { kind: 'stderr' }> => e.kind === 'stderr')
+      .filter((e): e is Extract<WorkingDirEvent, { kind: 'stderr' }> => e.kind === 'stderr')
       .map((e) => e.chunk)
       .join('');
     expect(stderr).toMatch(/no installed terraform binary/);
@@ -330,13 +330,13 @@ describe('workspace/runner', () => {
     useFakeTool(['1.6.6']);
 
     const monoRoot = await mkMonorepo(['nope']);
-    const ws = await discoverWorkspaces(monoRoot);
-    const events: WorkspaceEvent[] = [];
-    for await (const e of runWorkspaces(ws, 'bogus', [])) {
+    const ws = await discoverWorkingDirs(monoRoot);
+    const events: WorkingDirEvent[] = [];
+    for await (const e of runWorkingDirs(ws, 'bogus', [])) {
       events.push(e);
     }
     const stderr = events
-      .filter((e): e is Extract<WorkspaceEvent, { kind: 'stderr' }> => e.kind === 'stderr')
+      .filter((e): e is Extract<WorkingDirEvent, { kind: 'stderr' }> => e.kind === 'stderr')
       .map((e) => e.chunk)
       .join('');
     expect(stderr).toMatch(/unknown command 'bogus'/);
@@ -351,10 +351,10 @@ describe('workspace/runner', () => {
     spawnMock.mockReturnValue(fake.child);
 
     const monoRoot = await mkMonorepo(['pinned']);
-    const ws = await discoverWorkspaces(monoRoot);
+    const ws = await discoverWorkingDirs(monoRoot);
 
     const { events, startedPromise, consumer } = await runAndCollect(
-      runWorkspaces(ws, 'plan', [], { toolVersionRef: '1.5.3' }),
+      runWorkingDirs(ws, 'plan', [], { toolVersionRef: '1.5.3' }),
       1,
     );
     await startedPromise;

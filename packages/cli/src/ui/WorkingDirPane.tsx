@@ -1,13 +1,13 @@
 import React, { useRef } from 'react';
 import { Box, Text, useBoxMetrics, useInput, type DOMElement } from 'ink';
-import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
 import { ProgressBar } from './ProgressBar.js';
 import { Spinner } from './Spinner.js';
 import { OutputView } from './OutputView.js';
 import { Confirm } from './Confirm.js';
 
 export interface WorkingDirPaneProps {
-  workspace: WorkingDirDisplay;
+  workingDir: WorkingDirDisplay;
   command: string;
   commandArgs: readonly string[];
   autoApprove: boolean;
@@ -19,7 +19,7 @@ export interface WorkingDirPaneProps {
 }
 
 export function WorkingDirPane({
-  workspace,
+  workingDir,
   command,
   commandArgs,
   autoApprove,
@@ -55,8 +55,8 @@ export function WorkingDirPane({
   // cells of chrome the OutputView's own Box doesn't have to pay for.
   const contentWidth = hasMeasured ? Math.max(0, outerWidth - 4) : 0;
 
-  const toolLabel = workspace.toolId
-    ? `${workspace.toolId}${workspace.version ? ` ${workspace.version}` : ''}`
+  const toolLabel = workingDir.toolId
+    ? `${workingDir.toolId}${workingDir.version ? ` ${workingDir.version}` : ''}`
     : '?';
   const argsLabel = commandArgs.length > 0 ? ` ${commandArgs.join(' ')}` : '';
 
@@ -72,34 +72,34 @@ export function WorkingDirPane({
       {...(marginTop !== undefined ? { marginTop } : {})}
     >
       <Box marginBottom={1} width="100%">
-        <Text bold wrap="truncate">{workspace.dir}</Text>
+        <Text bold wrap="truncate">{workingDir.dir}</Text>
         <Text> · {toolLabel} {command}{argsLabel}</Text>
       </Box>
-      {workspace.state === 'resolving' ? (
+      {workingDir.state === 'resolving' ? (
         <Spinner label={`resolving ${toolLabel}`} />
-      ) : workspace.state === 'running' ? (
-        <ProgressBar value={workspace.progressPercent} label={workspace.progressLabel} />
+      ) : workingDir.state === 'running' ? (
+        <ProgressBar value={workingDir.progressPercent} label={workingDir.progressLabel} />
       ) : null}
       <OutputView
-        stdout={workspace.stdout}
-        stderr={workspace.stderr}
+        stdout={workingDir.stdout}
+        stderr={workingDir.stderr}
         maxLines={30}
         contentWidth={contentWidth}
       />
-      {workspace.prompt ? (
+      {workingDir.prompt ? (
         <Confirm
-          question={workspace.prompt.req.question}
-          defaultValue={workspace.prompt.req.defaultValue === 'yes'}
+          question={workingDir.prompt.req.question}
+          defaultValue={workingDir.prompt.req.defaultValue === 'yes'}
           autoYes={autoApprove}
           onAnswer={(v) => onPromptAnswer(v ? 'yes' : 'no')}
         />
       ) : null}
-      {workspace.state === 'exited' ? (
+      {workingDir.state === 'exited' ? (
         <Box marginTop={1}>
-          <Text color={workspace.exitCode === 0 ? 'green' : 'red'}>
-            {workspace.exitCode === 0
-              ? `✔ done in ${formatElapsed(workspace.startedAt, workspace.endedAt)}`
-              : `✖ failed (exit ${workspace.exitCode ?? workspace.exitSignal ?? '?'})`}
+          <Text color={workingDir.exitCode === 0 ? 'green' : 'red'}>
+            {workingDir.exitCode === 0
+              ? `✔ done in ${formatElapsed(workingDir.startedAt, workingDir.endedAt)}`
+              : `✖ failed (exit ${workingDir.exitCode ?? workingDir.exitSignal ?? '?'})`}
           </Text>
         </Box>
       ) : null}

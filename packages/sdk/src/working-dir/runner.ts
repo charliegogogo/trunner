@@ -5,18 +5,18 @@ import type {
   PromptRequest,
   PromptAnswer,
 } from '../types/events.js';
-import type { Workspace } from './discover.js';
+import type { WorkingDir } from './discover.js';
 import { createRunner, type RunnerHandle } from '../runner/executor.js';
 import { getDefaultRegistry } from '../registry/tool-registry.js';
 
-export type WorkspaceEvent =
-  | { kind: 'started'; workspace: Workspace }
-  | { kind: 'resolving'; workspace: Workspace; toolId: ToolId; version: string | null }
-  | { kind: 'stdout'; workspace: Workspace; chunk: string }
-  | { kind: 'stderr'; workspace: Workspace; chunk: string }
-  | { kind: 'progress'; workspace: Workspace; info: ProgressInfo }
-  | { kind: 'prompt'; workspace: Workspace; req: PromptRequest; answer: PromptAnswer }
-  | { kind: 'exited'; workspace: Workspace; code: number | null; signal: NodeJS.Signals | null }
+export type WorkingDirEvent =
+  | { kind: 'started'; workingDir: WorkingDir }
+  | { kind: 'resolving'; workingDir: WorkingDir; toolId: ToolId; version: string | null }
+  | { kind: 'stdout'; workingDir: WorkingDir; chunk: string }
+  | { kind: 'stderr'; workingDir: WorkingDir; chunk: string }
+  | { kind: 'progress'; workingDir: WorkingDir; info: ProgressInfo }
+  | { kind: 'prompt'; workingDir: WorkingDir; req: PromptRequest; answer: PromptAnswer }
+  | { kind: 'exited'; workingDir: WorkingDir; code: number | null; signal: NodeJS.Signals | null }
   | { kind: 'done'; summary: RunSummary };
 
 export interface RunSummary {
@@ -24,11 +24,11 @@ export interface RunSummary {
   succeeded: number;
   failed: number;
   /** dir → exit code (0, non-zero, or null when killed by a signal). */
-  workspaces: Map<string, number | null>;
+  workingDirs: Map<string, number | null>;
 }
 
-export interface RunWorkspacesOptions {
-  /** Max workspaces running in parallel. Default: os.cpus().length. */
+export interface RunWorkingDirsOptions {
+  /** Max working directories running in parallel. Default: os.cpus().length. */
   readonly concurrency?: number;
   /**
    * Pin the tool binary version (e.g. "1.6.6"). Overrides .trunnerrc's
@@ -37,7 +37,7 @@ export interface RunWorkspacesOptions {
    * auto-install is Phase 2B.
    */
   readonly toolVersionRef?: string;
-  /** Override the workspace's .trunnerrc `tool` field for this invocation. */
+  /** Override the working directory's .trunnerrc `tool` field for this invocation. */
   readonly toolOverride?: string;
   /** If true, pass --auto-approve / -auto-approve when supported. */
   readonly autoApprove?: boolean;
@@ -45,26 +45,26 @@ export interface RunWorkspacesOptions {
 
 const DEFAULT_CONCURRENCY = (): number => Math.max(1, cpus().length);
 
-export async function* runWorkspaces(
-  workspaces: readonly Workspace[],
+export async function* runWorkingDirs(
+  workingDirs: readonly WorkingDir[],
   command: string,
   args: readonly string[],
-  opts: RunWorkspacesOptions = {},
-): AsyncIterable<WorkspaceEvent> {
+  opts: RunWorkingDirsOptions = {},
+): AsyncIterable<WorkingDirEvent> {
   const concurrency = Math.max(1, opts.concurrency ?? DEFAULT_CONCURRENCY());
-  const queue: Workspace[] = [...workspaces];
+  const queue: WorkingDir[] = [...workingDirs];
 
   const summary: RunSummary = {
-    total: workspaces.length,
+    total: workingDirs.length,
     succeeded: 0,
     failed: 0,
-    workspaces: new Map(),
+    workingDirs: new Map(),
   };
 
-  type Slot = { event: WorkspaceEvent };
+  type Slot = { event: WorkingDirEvent };
   const slots: Slot[] = [];
   let waiter: ((slot: Slot) => void) | null = null;
-  const push = (event: WorkspaceEvent): void => {
+  const push = (event: WorkingDirEvent): void => {
     if (waiter) {
       const w = waiter;
       waiter = null;
@@ -99,41 +99,41 @@ export async function* runWorkspaces(
 }
 
 async function worker(
-  queue: Workspace[],
+  queue: WorkingDir[],
   command: string,
   args: readonly string[],
-  opts: RunWorkspacesOptions,
-  push: (e: WorkspaceEvent) => void,
+  opts: RunWorkingDirsOptions,
+  push: (e: WorkingDirEvent) => void,
   summary: RunSummary,
 ): Promise<void> {
   while (queue.length > 0) {
-    const ws = queue.shift() as Workspace;
-    push({ kind: 'started', workspace: ws });
-    const code = await runOneWorkspace(ws, command, args, opts, push);
-    summary.workspaces.set(ws.dir, code);
+    const wd = queue.shift() as WorkingDir;
+    push({ kind: 'started', workingDir: wd });
+    const code = await runOneWorkingDir(wd, command, args, opts, push);
+    summary.workingDirs.set(wd.dir, code);
     if (code === 0) summary.succeeded++;
     else summary.failed++;
   }
 }
 
-async function runOneWorkspace(
-  ws: Workspace,
+async function runOneWorkingDir(
+  wd: WorkingDir,
   command: string,
   args: readonly string[],
-  opts: RunWorkspacesOptions,
-  push: (e: WorkspaceEvent) => void,
+  opts: RunWorkingDirsOptions,
+  push: (e: WorkingDirEvent) => void,
 ): Promise<number | null> {
-  const toolId = (opts.toolOverride ?? ws.config.tool) as ToolId;
+  const toolId = (opts.toolOverride ?? wd.config.tool) as ToolId;
   const tool = getDefaultRegistry().get(toolId);
 
   const installed = await tool.binary.listInstalled();
-  const version = pickVersion(installed, opts.toolVersionRef, ws.config.version);
-  push({ kind: 'resolving', workspace: ws, toolId, version });
+  const version = pickVersion(installed, opts.toolVersionRef, wd.config.version);
+  push({ kind: 'resolving', workingDir: wd, toolId, version });
 
   if (!version) {
     const msg = `error: no installed ${toolId} binary found. Run: trunner tools install ${toolId} [version]\n`;
-    push({ kind: 'stderr', workspace: ws, chunk: msg });
-    push({ kind: 'exited', workspace: ws, code: 1, signal: null });
+    push({ kind: 'stderr', workingDir: wd, chunk: msg });
+    push({ kind: 'exited', workingDir: wd, code: 1, signal: null });
     return 1;
   }
 
@@ -141,13 +141,13 @@ async function runOneWorkspace(
   if (!spec) {
     const available = tool.commands.list().map((c) => c.name).join(', ');
     const msg = `error: unknown command '${command}' for ${toolId}. Available: ${available}\n`;
-    push({ kind: 'stderr', workspace: ws, chunk: msg });
-    push({ kind: 'exited', workspace: ws, code: 1, signal: null });
+    push({ kind: 'stderr', workingDir: wd, chunk: msg });
+    push({ kind: 'exited', workingDir: wd, code: 1, signal: null });
     return 1;
   }
 
   const toolArgs = tool.commands.buildInvocation(command, {
-    cwd: ws.dir,
+    cwd: wd.dir,
     extraArgs: [...args],
     autoApprove: opts.autoApprove,
   });
@@ -155,24 +155,24 @@ async function runOneWorkspace(
   const binaryPath = tool.binary.binaryPath(version);
 
   const runner: RunnerHandle = createRunner({});
-  runner.on('stdout', (chunk) => push({ kind: 'stdout', workspace: ws, chunk }));
-  runner.on('stderr', (chunk) => push({ kind: 'stderr', workspace: ws, chunk }));
-  runner.on('progress', (info) => push({ kind: 'progress', workspace: ws, info }));
-  runner.on('prompt', (req, answer) => push({ kind: 'prompt', workspace: ws, req, answer }));
+  runner.on('stdout', (chunk) => push({ kind: 'stdout', workingDir: wd, chunk }));
+  runner.on('stderr', (chunk) => push({ kind: 'stderr', workingDir: wd, chunk }));
+  runner.on('progress', (info) => push({ kind: 'progress', workingDir: wd, info }));
+  runner.on('prompt', (req, answer) => push({ kind: 'prompt', workingDir: wd, req, answer }));
 
   let code: number | null = 0;
   let signal: NodeJS.Signals | null = null;
   runner.on('exit', (c, s) => {
     code = c;
     signal = s;
-    push({ kind: 'exited', workspace: ws, code: c, signal: s });
+    push({ kind: 'exited', workingDir: wd, code: c, signal: s });
   });
 
   try {
-    await runner.run({ binaryPath, args: toolArgs, cwd: ws.dir });
+    await runner.run({ binaryPath, args: toolArgs, cwd: wd.dir });
   } catch (err) {
-    push({ kind: 'stderr', workspace: ws, chunk: `error: spawn failed: ${(err as Error).message}\n` });
-    push({ kind: 'exited', workspace: ws, code: 1, signal: null });
+    push({ kind: 'stderr', workingDir: wd, chunk: `error: spawn failed: ${(err as Error).message}\n` });
+    push({ kind: 'exited', workingDir: wd, code: 1, signal: null });
     return 1;
   }
 

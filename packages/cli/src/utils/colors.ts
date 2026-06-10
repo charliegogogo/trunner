@@ -1,8 +1,8 @@
 /**
- * Color utility functions for workspace output visualization.
+ * Color utility functions for working directory output visualization.
  *
  * Colors are generated in the purple-to-blue range (HSL color space)
- * with good visual separation between workspaces.
+ * with good visual separation between working directories.
  */
 
 /**
@@ -46,18 +46,18 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 /**
- * Get a color for a workspace based on its index.
+ * Get a color for a working directory based on its index.
  *
  * Uses a purple-to-blue hue range with maximum visual separation:
  * - Hue range: 270° (purple) → 330° (pink) → 0° (red) → 180° (cyan) → 210° (blue)
  * - Saturation: 75% (vibrant but not harsh)
  * - Lightness: 65% (readable on dark backgrounds)
  *
- * @param index - Workspace index (0-based)
- * @param total - Total number of workspaces
+ * @param index - Working directory index (0-based)
+ * @param total - Total number of working directories
  * @returns RGB hex color string (e.g., "#b48cff")
  */
-export function getWorkspaceColor(index: number, total: number): string {
+export function getWorkingDirColor(index: number, total: number): string {
   if (total <= 0) return '#b48cff';
   if (total === 1) return '#b48cff';
 
@@ -71,14 +71,14 @@ export function getWorkspaceColor(index: number, total: number): string {
 }
 
 /**
- * Get ANSI escape code for a workspace color.
+ * Get ANSI escape code for a working directory color.
  * Returns the full escape sequence including reset.
  */
-export function getWorkspaceAnsiColor(index: number, total: number): {
+export function getWorkingDirAnsiColor(index: number, total: number): {
   open: string;
   close: string;
 } {
-  const hex = getWorkspaceColor(index, total);
+  const hex = getWorkingDirColor(index, total);
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -90,15 +90,15 @@ export function getWorkspaceAnsiColor(index: number, total: number): {
 }
 
 /**
- * Get Ink-compatible color prop for a workspace.
+ * Get Ink-compatible color prop for a working directory.
  * Returns an RGB object that Ink's Text component can use.
  */
-export function getWorkspaceInkColor(index: number, total: number): {
+export function getWorkingDirInkColor(index: number, total: number): {
   r: number;
   g: number;
   b: number;
 } {
-  const hex = getWorkspaceColor(index, total);
+  const hex = getWorkingDirColor(index, total);
   return {
     r: parseInt(hex.slice(1, 3), 16),
     g: parseInt(hex.slice(3, 5), 16),

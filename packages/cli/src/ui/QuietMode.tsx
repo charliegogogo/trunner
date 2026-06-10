@@ -1,10 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
 import type { RunSummary } from '@trunner/sdk';
 
 export interface QuietModeProps {
-  workspaces: WorkingDirDisplay[];
+  workingDirs: WorkingDirDisplay[];
   summary: RunSummary | null;
   width: number;
   height: number;
@@ -18,7 +18,7 @@ function shortDir(dir: string): string {
   return dir;
 }
 
-export function QuietMode({ workspaces, summary, width, height }: QuietModeProps): React.ReactElement {
+export function QuietMode({ workingDirs, summary, width, height }: QuietModeProps): React.ReactElement {
   const now = Date.now();
 
   return (
@@ -43,13 +43,13 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
       {/* Results */}
       {summary ? (
         <Box flexDirection="column" paddingX={1}>
-          {workspaces.map((ws) => {
-            const elapsed = ws.endedAt ? ws.endedAt - ws.startedAt : now - ws.startedAt;
+          {workingDirs.map((wd) => {
+            const elapsed = wd.endedAt ? wd.endedAt - wd.startedAt : now - wd.startedAt;
             const elapsedStr = (elapsed / 1000).toFixed(1) + 's';
-            if (ws.state === 'exited') {
-              if (ws.exitCode === 0 && ws.parsedResult?.changes) {
-                const { add, change, destroy } = ws.parsedResult.changes;
-                const resultType = ws.parsedResult.resultType ?? 'plan';
+            if (wd.state === 'exited') {
+              if (wd.exitCode === 0 && wd.parsedResult?.changes) {
+                const { add, change, destroy } = wd.parsedResult.changes;
+                const resultType = wd.parsedResult.resultType ?? 'plan';
                 let resultText: string;
                 if (resultType === 'apply') {
                   resultText = `Apply complete! Resources: ${add} added, ${change} changed, ${destroy} destroyed.`;
@@ -59,21 +59,21 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
                   resultText = `Plan: ${add} to add, ${change} to change, ${destroy} to destroy.`;
                 }
                 return (
-                  <Box key={ws.dir} flexDirection="row">
+                  <Box key={wd.dir} flexDirection="row">
                     <Text color="magenta">✓</Text>
                     <Text> </Text>
-                    <Text bold>{shortDir(ws.dir)}</Text>
+                    <Text bold>{shortDir(wd.dir)}</Text>
                     <Text dimColor>: </Text>
                     <Text color="green">{resultText}</Text>
                     <Text dimColor> ({elapsedStr})</Text>
                   </Box>
                 );
-              } else if (ws.exitCode === 0) {
+              } else if (wd.exitCode === 0) {
                 return (
-                  <Box key={ws.dir} flexDirection="row">
+                  <Box key={wd.dir} flexDirection="row">
                     <Text color="magenta">✓</Text>
                     <Text> </Text>
-                    <Text bold>{shortDir(ws.dir)}</Text>
+                    <Text bold>{shortDir(wd.dir)}</Text>
                     <Text dimColor>: </Text>
                     <Text color="green">ok</Text>
                     <Text dimColor> ({elapsedStr})</Text>
@@ -81,30 +81,30 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
                 );
               } else {
                 return (
-                  <Box key={ws.dir} flexDirection="column">
+                  <Box key={wd.dir} flexDirection="column">
                     <Box flexDirection="row">
                       <Text color="red">✗</Text>
                       <Text> </Text>
-                      <Text bold>{shortDir(ws.dir)}</Text>
+                      <Text bold>{shortDir(wd.dir)}</Text>
                       <Text dimColor>: </Text>
-                      <Text color="red">failed (exit {ws.exitCode ?? '?'})</Text>
+                      <Text color="red">failed (exit {wd.exitCode ?? '?'})</Text>
                       <Text dimColor> ({elapsedStr})</Text>
                     </Box>
-                    {ws.parsedResult?.errors && ws.parsedResult.errors.length > 0 && (
-                      <Text dimColor>  {ws.parsedResult.errors[0]}</Text>
+                    {wd.parsedResult?.errors && wd.parsedResult.errors.length > 0 && (
+                      <Text dimColor>  {wd.parsedResult.errors[0]}</Text>
                     )}
-                    {ws.stderr.trim() && <Text dimColor>{ws.stderr.trim()}</Text>}
+                    {wd.stderr.trim() && <Text dimColor>{wd.stderr.trim()}</Text>}
                   </Box>
                 );
               }
             } else {
               return (
-                <Box key={ws.dir} flexDirection="row">
+                <Box key={wd.dir} flexDirection="row">
                   <Text color="cyan">○</Text>
                   <Text> </Text>
-                  <Text bold>{shortDir(ws.dir)}</Text>
+                  <Text bold>{shortDir(wd.dir)}</Text>
                   <Text dimColor>: </Text>
-                  <Text color="cyan">{ws.state}</Text>
+                  <Text color="cyan">{wd.state}</Text>
                   <Text dimColor> ({elapsedStr})</Text>
                 </Box>
               );

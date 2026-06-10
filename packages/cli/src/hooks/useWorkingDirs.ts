@@ -5,7 +5,7 @@ import type {
   PromptRequest,
   PromptAnswer,
   TrunnerRc,
-  WorkspaceEvent,
+  WorkingDirEvent,
   RunSummary,
   ParsedSummary,
 } from '@trunner/sdk';
@@ -76,7 +76,7 @@ function progressPercentOf(info: ProgressInfo): number {
 }
 
 export function useWorkingDirs(
-  iter: AsyncIterable<WorkspaceEvent> | null,
+  iter: AsyncIterable<WorkingDirEvent> | null,
   options: UseWorkingDirsOptions = {},
 ): UseWorkingDirsResult {
   const [workingDirs, setWorkingDirs] = useState<WorkingDirDisplay[]>([]);
@@ -104,11 +104,11 @@ export function useWorkingDirs(
         for await (const e of iter) {
           if (cancelled) return;
           if (e.kind === 'started') {
-            setWorkingDirs((prev) => [...prev, initial(e.workspace.dir, e.workspace.config)]);
+            setWorkingDirs((prev) => [...prev, initial(e.workingDir.dir, e.workingDir.config)]);
           } else if (e.kind === 'resolving') {
             setWorkingDirs((prev) =>
               prev.map((w) =>
-                w.dir === e.workspace.dir
+                w.dir === e.workingDir.dir
                   ? { ...w, state: 'resolving', toolId: e.toolId, version: e.version }
                   : w,
               ),
@@ -116,7 +116,7 @@ export function useWorkingDirs(
           } else if (e.kind === 'stdout') {
             setWorkingDirs((prev) =>
               prev.map((w) =>
-                w.dir === e.workspace.dir
+                w.dir === e.workingDir.dir
                   ? { ...w, stdout: w.stdout + e.chunk, state: 'running' as const }
                   : w,
               ),
@@ -124,7 +124,7 @@ export function useWorkingDirs(
           } else if (e.kind === 'stderr') {
             setWorkingDirs((prev) =>
               prev.map((w) =>
-                w.dir === e.workspace.dir
+                w.dir === e.workingDir.dir
                   ? { ...w, stderr: w.stderr + e.chunk, state: 'running' as const }
                   : w,
               ),
@@ -132,7 +132,7 @@ export function useWorkingDirs(
           } else if (e.kind === 'progress') {
             setWorkingDirs((prev) =>
               prev.map((w) =>
-                w.dir === e.workspace.dir
+                w.dir === e.workingDir.dir
                   ? {
                       ...w,
                       progress: e.info,
@@ -144,10 +144,10 @@ export function useWorkingDirs(
               ),
             );
           } else if (e.kind === 'prompt') {
-            promptAnswersRef.current.set(e.workspace.dir, e.answer);
+            promptAnswersRef.current.set(e.workingDir.dir, e.answer);
             setWorkingDirs((prev) =>
               prev.map((w) =>
-                w.dir === e.workspace.dir
+                w.dir === e.workingDir.dir
                   ? { ...w, prompt: { req: e.req, answer: e.answer } }
                   : w,
               ),
@@ -155,7 +155,7 @@ export function useWorkingDirs(
           } else if (e.kind === 'exited') {
             setWorkingDirs((prev) =>
               prev.map((w) => {
-                if (w.dir !== e.workspace.dir) return w;
+                if (w.dir !== e.workingDir.dir) return w;
                 const parsedResult = parsePlanAndApplyOutput(w.stdout, w.stderr, { includeDiagnostics: e.code !== 0 });
                 return {
                   ...w,
@@ -168,7 +168,7 @@ export function useWorkingDirs(
                 };
               }),
             );
-            promptAnswersRef.current.delete(e.workspace.dir);
+            promptAnswersRef.current.delete(e.workingDir.dir);
           } else if (e.kind === 'done') {
             setSummary(e.summary);
             onDoneRef.current?.(e.summary);

@@ -3,8 +3,8 @@ import { EventEmitter } from 'node:events';
 import React, { useRef } from 'react';
 import { render, Box, Text, useBoxMetrics, type DOMElement, type Instance as InkInstance } from 'ink';
 import { StatusBar } from '../../src/ui/StatusBar.js';
-import { WorkingDirPane } from '../../src/ui/WorkspacePane.js';
-import type { WorkingDirDisplay } from '../../src/hooks/useWorkspaces.js';
+import { WorkingDirPane } from '../../src/ui/WorkingDirPane.js';
+import type { WorkingDirDisplay } from '../../src/hooks/useWorkingDirs.js';
 
 type FakeStdout = {
   columns: number;
@@ -156,7 +156,7 @@ describe('resize: StatusBar spans current terminal width', () => {
     const { stdout, stdin } = createStdio(100);
     const inst = trackedRender(
       React.createElement(StatusBar, {
-        workspaces: [makeWs('/tmp/a'), makeWs('/tmp/b')],
+        workingDirs: [makeWs('/tmp/a'), makeWs('/tmp/b')],
         focusedIndex: 0,
       }),
       stdout,
@@ -176,7 +176,7 @@ describe('resize: StatusBar spans current terminal width', () => {
     const { stdout, stdin } = createStdio(100);
     const inst = trackedRender(
       React.createElement(StatusBar, {
-        workspaces: [makeWs('/tmp/a')],
+        workingDirs: [makeWs('/tmp/a')],
         focusedIndex: 0,
       }),
       stdout,
@@ -201,7 +201,7 @@ describe('resize: StatusBar spans current terminal width', () => {
   });
 });
 
-describe('resize: useBoxMetrics + WorkspacePane', () => {
+describe('resize: useBoxMetrics + WorkingDirPane', () => {
   it('useBoxMetrics ref returns the rendered box width, updates on resize', async () => {
     const { stdout, stdin } = createStdio(100);
     function WidthProbe(): React.ReactElement {
@@ -232,7 +232,7 @@ describe('resize: useBoxMetrics + WorkspacePane', () => {
     expect(frame).toMatch(/w:6[0-2]/);
   });
 
-  it('WorkspacePane contentWidth shrinks on resize and truncates long lines with ellipsis', async () => {
+  it('WorkingDirPane contentWidth shrinks on resize and truncates long lines with ellipsis', async () => {
     // 200 cols gives ample headroom so the 80-char line is NOT truncated
     // at startup; resizing to 40 cols forces OutputView's truncation to
     // kick in. We assert the count of visible 'x' chars shrinks.
@@ -247,7 +247,7 @@ describe('resize: useBoxMetrics + WorkspacePane', () => {
     });
     const inst = trackedRender(
       <WorkingDirPane
-        workspace={ws}
+        workingDir={ws}
         command="plan"
         commandArgs={[]}
         autoApprove={false}

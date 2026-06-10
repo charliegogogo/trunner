@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeFile, mkdir, rm } from 'node:fs/promises';
-import { parseRc, rcPathFor, RcParseError, TRUNNERRC_FILENAME } from '../../src/workspace/trunner-rc.js';
+import { parseRc, rcPathFor, RcParseError, TRUNNERRC_FILENAME } from '../../src/working-dir/trunner-rc.js';
 
 let root: string;
 
@@ -23,7 +23,7 @@ async function writeRc(name: string, content: string): Promise<string> {
   return path;
 }
 
-describe('workspace/trunner-rc', () => {
+describe('working-dir/trunner-rc', () => {
   it('parses a minimal rc with just the tool field', async () => {
     const path = await writeRc('a', 'tool = "terraform"\n');
     const { config, warnings } = await parseRc(path);

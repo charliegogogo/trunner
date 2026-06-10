@@ -46,14 +46,14 @@ export type { ExtractResult, ExtractOptions } from './installer/extractor.js';
 export { download, fetchBuffer } from './installer/downloader.js';
 export type { DownloadOptions, DownloadResult } from './installer/downloader.js';
 
-export { parseRc, rcPathFor, RcParseError, TRUNNERRC_FILENAME } from './workspace/trunner-rc.js';
-export type { TrunnerRc, ParseRcWarning, ParseRcResult } from './workspace/trunner-rc.js';
+export { parseRc, rcPathFor, RcParseError, TRUNNERRC_FILENAME } from './working-dir/trunner-rc.js';
+export type { TrunnerRc, ParseRcWarning, ParseRcResult } from './working-dir/trunner-rc.js';
 
-export { discoverWorkspaces, ALWAYS_EXCLUDE } from './workspace/discover.js';
-export type { Workspace, DiscoverOptions } from './workspace/discover.js';
+export { discoverWorkingDirs, ALWAYS_EXCLUDE } from './working-dir/discover.js';
+export type { WorkingDir, DiscoverOptions } from './working-dir/discover.js';
 
-export { runWorkspaces } from './workspace/runner.js';
-export type { WorkspaceEvent, RunSummary, RunWorkspacesOptions } from './workspace/runner.js';
+export { runWorkingDirs } from './working-dir/runner.js';
+export type { WorkingDirEvent, RunSummary, RunWorkingDirsOptions } from './working-dir/runner.js';
 
 export type {
   Tool,

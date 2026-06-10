@@ -3,15 +3,15 @@ import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import { stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import {
-  discoverWorkspaces,
+  discoverWorkingDirs,
   rcPathFor,
   parseRc,
-  runWorkspaces,
-  type Workspace,
-  type WorkspaceEvent,
+  runWorkingDirs,
+  type WorkingDir,
+  type WorkingDirEvent,
   type RunSummary,
 } from '@trunner/sdk';
-import { useWorkingDirs, type WorkingDirDisplay } from './hooks/useWorkspaces.js';
+import { useWorkingDirs, type WorkingDirDisplay } from './hooks/useWorkingDirs.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ExecutionView } from './ui/ExecutionView.js';
 import { StreamView } from './ui/StreamView.js';
@@ -32,7 +32,7 @@ type Phase = 'discovering' | 'running' | 'done' | 'error' | 'executing';
 
 interface DiscoverState {
   phase: Phase;
-  workspaces: Workspace[];
+  workingDirs: WorkingDir[];
   error: string | null;
   summary: RunSummary | null;
 }
@@ -117,17 +117,17 @@ interface InteractiveExecutionProps {
 
 /**
  * InteractiveExecution handles running commands in interactive mode.
- * It discovers workspaces, runs commands, and shows the ExecutionView (carousel).
+ * It discovers working directories, runs commands, and shows the ExecutionView (carousel).
  * Unlike the non-interactive path, it does NOT auto-exit - user presses Esc to exit.
  */
 function InteractiveExecution({ command, commandArgs, flags, onExit }: InteractiveExecutionProps): React.ReactElement {
   const [state, setState] = useState<DiscoverState>({
     phase: 'discovering',
-    workspaces: [],
+    workingDirs: [],
     error: null,
     summary: null,
   });
-  const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
+  const [iter, setIter] = useState<AsyncIterable<WorkingDirEvent> | null>(null);
   const ink = useApp();
   const { isRawModeSupported } = useStdin();
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -147,7 +147,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
     let cancelled = false;
     (async () => {
       try {
-        const ws = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+        const ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
         if (cancelled) return;
         if (ws.length === 0) {
           const cwdAbs = resolvePath(flags.cwd);
@@ -168,14 +168,14 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
             : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
           setState({
             phase: 'error',
-            workspaces: [],
+            workingDirs: [],
             error: msg,
             summary: null,
           });
           return;
         }
-        setState((cur) => ({ ...cur, phase: 'running', workspaces: ws }));
-        const it = runWorkspaces(ws, command, commandArgs, {
+        setState((cur) => ({ ...cur, phase: 'running', workingDirs: ws }));
+        const it = runWorkingDirs(ws, command, commandArgs, {
           ...(typeof flags.concurrency === 'number' ? { concurrency: flags.concurrency } : {}),
           ...(flags.toolVersion ? { toolVersionRef: flags.toolVersion } : {}),
           ...(flags.tool ? { toolOverride: flags.tool } : {}),
@@ -186,7 +186,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
         if (cancelled) return;
         setState({
           phase: 'error',
-          workspaces: [],
+          workingDirs: [],
           error: (err as Error).message,
           summary: null,
         });
@@ -276,7 +276,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
 
   return (
     <ExecutionView
-      workspaces={workingDirs}
+      workingDirs={workingDirs}
       focusedIndex={focusedIndex}
       scrollOffset={scrollOffset}
       isComplete={state.phase === 'done'}
@@ -311,12 +311,12 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
 
       // Scan all subdirectories to detect mixed tools
       try {
-        const workspaces = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
-        const tools = new Set(workspaces.map((ws) => ws.config.tool));
+        const workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        const tools = new Set(workingDirs.map((ws) => ws.config.tool));
         if (tools.size > 1) {
           setDetectedTool('mixed');
         } else if (tools.size === 1) {
-          const tool = workspaces[0]?.config.tool;
+          const tool = workingDirs[0]?.config.tool;
           setDetectedTool(tool ?? 'terraform');
         } else {
           setDetectedTool('terraform');
@@ -383,11 +383,11 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
 
   const [state, setState] = useState<DiscoverState>({
     phase: 'discovering',
-    workspaces: [],
+    workingDirs: [],
     error: null,
     summary: null,
   });
-  const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
+  const [iter, setIter] = useState<AsyncIterable<WorkingDirEvent> | null>(null);
   const ink = useApp();
   const { isRawModeSupported } = useStdin();
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -405,7 +405,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     let cancelled = false;
     (async () => {
       try {
-        const ws = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+        const ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
         if (cancelled) return;
         if (ws.length === 0) {
           const cwdAbs = resolvePath(flags.cwd);
@@ -426,14 +426,14 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
             : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
           setState({
             phase: 'error',
-            workspaces: [],
+            workingDirs: [],
             error: msg,
             summary: null,
           });
           return;
         }
-        setState((cur) => ({ ...cur, phase: 'running', workspaces: ws }));
-        const it = runWorkspaces(ws, command ?? '', commandArgs, {
+        setState((cur) => ({ ...cur, phase: 'running', workingDirs: ws }));
+        const it = runWorkingDirs(ws, command ?? '', commandArgs, {
           ...(typeof flags.concurrency === 'number' ? { concurrency: flags.concurrency } : {}),
           ...(flags.toolVersion ? { toolVersionRef: flags.toolVersion } : {}),
           ...(flags.tool ? { toolOverride: flags.tool } : {}),
@@ -444,7 +444,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         if (cancelled) return;
         setState({
           phase: 'error',
-          workspaces: [],
+          workingDirs: [],
           error: (err as Error).message,
           summary: null,
         });
@@ -546,7 +546,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   // Show StreamView for both running and done phases (streaming output with prefixes)
   return (
     <StreamView
-      workspaces={workingDirs}
+      workingDirs={workingDirs}
       cwd={flags.cwd}
       command={command}
       summary={summary ?? state.summary}

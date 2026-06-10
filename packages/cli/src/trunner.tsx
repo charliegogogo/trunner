@@ -4,14 +4,14 @@ import React from 'react';
 import { App } from './app.js';
 import { renderToolsCommand } from './commands/tools.js';
 import { renderProvidersCommand } from './commands/providers.js';
-import { discoverWorkspaces, runWorkspaces } from '@trunner/sdk';
+import { discoverWorkingDirs, runWorkingDirs } from '@trunner/sdk';
 import type { CliFlags, CliSubcommand } from './types.js';
 
 const cli = meow(
   `
     Usage
       $ trunner                  Interactive mode: select command and tool step-by-step
-      $ trunner <command> [args...]   Run a tool command across every discovered workspace
+      $ trunner <command> [args...]   Run a tool command across every discovered working directory
       $ trunner tools                 List installed tools + their versions
       $ trunner tools install <name>  Install a tool (e.g. trunner tools install terraform 1.6.6)
       $ trunner providers             List installed providers
@@ -20,14 +20,14 @@ const cli = meow(
 
     Options
        -t, --tool <name>         Override the .trunnerrc \`tool\` field for this invocation
-       --cwd <path>              Start the workspace scan from <path> instead of the actual cwd
+       --cwd <path>              Start the scan from <path> instead of the actual cwd
        --tool-version <semver>   Pin the tool binary version (e.g. 1.6.6, ~> 1.6)
        --include-prerelease      Allow pre-release versions in the solver (Phase 2B)
        --mirror <url>            Override the default terraform + provider mirror (Phase 2B)
-       --concurrency <n>         Max workspaces running in parallel (default: os.cpus().length)
+       --concurrency <n>         Max working directories running in parallel (default: os.cpus().length)
        --exclude <dir>           Add <dir> to the scan's exclude set (repeatable)
        --no-alt-screen           Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals)
-       --json                    Emit one JSON line per workspace event (CI-friendly; no TUI)
+       --json                    Emit one JSON line per working directory event (CI-friendly; no TUI)
        --quiet                   Suppress the status bar; emit only the final summary
        --auto-approve            Pass --auto-approve / -auto-approve when supported
        --no-color                Disable ANSI color in output
@@ -148,20 +148,20 @@ async function main(): Promise<void> {
 }
 
 /**
- * JSON mode: emit one JSON line per workspace event.
+ * JSON mode: emit one JSON line per working directory event.
  * No TUI, no Ink rendering — just JSON Lines to stdout.
  * Ideal for CI/CD pipelines and AI agent consumption.
  */
 async function runJsonMode(command: string, args: string[], flags: CliFlags): Promise<void> {
-  const workspaces = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+  const workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
 
-  if (workspaces.length === 0) {
+  if (workingDirs.length === 0) {
     const msg = `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
     process.stderr.write(JSON.stringify({ kind: 'error', message: msg }) + '\n');
     process.exit(1);
   }
 
-  const iter = runWorkspaces(workspaces, command, args, {
+  const iter = runWorkingDirs(workingDirs, command, args, {
     ...(typeof flags.concurrency === 'number' ? { concurrency: flags.concurrency } : {}),
     ...(flags.toolVersion ? { toolVersionRef: flags.toolVersion } : {}),
     ...(flags.tool ? { toolOverride: flags.tool } : {}),
@@ -176,10 +176,10 @@ async function runJsonMode(command: string, args: string[], flags: CliFlags): Pr
 }
 
 /**
- * Serialize a WorkspaceEvent to a plain object for JSON serialization.
+ * Serialize a WorkingDirEvent to a plain object for JSON serialization.
  * Handles special types like Map and function references.
  */
-function serializeEvent(event: import('@trunner/sdk').WorkspaceEvent): Record<string, unknown> {
+function serializeEvent(event: import('@trunner/sdk').WorkingDirEvent): Record<string, unknown> {
   if (event.kind === 'done') {
     return {
       kind: 'done',
@@ -187,19 +187,19 @@ function serializeEvent(event: import('@trunner/sdk').WorkspaceEvent): Record<st
         total: event.summary.total,
         succeeded: event.summary.succeeded,
         failed: event.summary.failed,
-        workspaces: Object.fromEntries(event.summary.workspaces),
+        workingDirs: Object.fromEntries(event.summary.workingDirs),
       },
     };
   }
 
   // For events with working directory, include dir and config
-  if ('workspace' in event) {
-    const { workspace, ...rest } = event;
+  if ('workingDir' in event) {
+    const { workingDir, ...rest } = event;
     return {
       ...rest,
-      workspace: {
-        dir: workspace.dir,
-        config: workspace.config,
+      workingDir: {
+        dir: workingDir.dir,
+        config: workingDir.config,
       },
     };
   }

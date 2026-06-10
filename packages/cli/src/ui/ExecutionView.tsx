@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
 
 export interface ExecutionViewProps {
-  workspaces: WorkingDirDisplay[];
+  workingDirs: WorkingDirDisplay[];
   focusedIndex: number;
   scrollOffset: number;
   isComplete: boolean;
@@ -43,10 +43,10 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, '');
 }
 
-export function ExecutionView({ workspaces, focusedIndex, scrollOffset, isComplete, width, height }: ExecutionViewProps): React.ReactElement {
+export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isComplete, width, height }: ExecutionViewProps): React.ReactElement {
   const tabHeight = 3;
   const outputHeight = height - tabHeight - 3;
-  const focused = workspaces[focusedIndex];
+  const focused = workingDirs[focusedIndex];
 
   const content = useMemo(() => {
     if (!focused) return [];
@@ -71,12 +71,12 @@ export function ExecutionView({ workspaces, focusedIndex, scrollOffset, isComple
       >
         <Text bold color="magenta">trunner</Text>
         <Text dimColor> │ </Text>
-        {workspaces.map((ws, i) => {
+        {workingDirs.map((wd, i) => {
           const isActive = i === focusedIndex;
-          const icon = stateIcon(ws.state, ws.exitCode);
-          const label = shortDir(ws.dir);
+          const icon = stateIcon(wd.state, wd.exitCode);
+          const label = shortDir(wd.dir);
           return (
-            <Text key={ws.dir}>
+            <Text key={wd.dir}>
               {i > 0 && <Text dimColor> │ </Text>}
               {isActive ? (
                 <Text bold color="magenta">
@@ -92,10 +92,10 @@ export function ExecutionView({ workspaces, focusedIndex, scrollOffset, isComple
           );
         })}
         <Text dimColor> │ </Text>
-        <Text dimColor>{workspaces.length} working director{workspaces.length === 1 ? 'y' : 'ies'}</Text>
+        <Text dimColor>{workingDirs.length} working director{workingDirs.length === 1 ? 'y' : 'ies'}</Text>
       </Box>
 
-      {/* Workspace output with purple border */}
+      {/* Working directory output with purple border */}
       {focused && (
         <Box
           flexDirection="column"

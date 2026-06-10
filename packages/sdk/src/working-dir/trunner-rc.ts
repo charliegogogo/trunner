@@ -8,11 +8,11 @@ export const TRUNNERRC_FILENAME = '.trunnerrc';
 export interface TrunnerRc {
   /** Absolute path to the .trunnerrc file. */
   readonly path: string;
-  /** The tool to use for this workspace. Defaults to 'terraform' if not specified. */
+  /** The tool to use for this working directory. Defaults to 'terraform' if not specified. */
   readonly tool: ToolId;
   /** Optional tool binary version constraint (e.g. "~> 1.6"). */
   readonly version?: string;
-  /** Optional per-workspace concurrency override. */
+  /** Optional per-working-directory concurrency override. */
   readonly concurrency?: number;
   /** Optional extra dirs to skip during the recursive scan. */
   readonly exclude?: readonly string[];
@@ -138,6 +138,6 @@ export async function parseRc(path: string): Promise<ParseRcResult> {
   return { config, warnings };
 }
 
-export function rcPathFor(workspaceDir: string): string {
-  return join(workspaceDir, TRUNNERRC_FILENAME);
+export function rcPathFor(workingDir: string): string {
+  return join(workingDir, TRUNNERRC_FILENAME);
 }

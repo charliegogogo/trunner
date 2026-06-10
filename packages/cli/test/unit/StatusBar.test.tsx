@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { StatusBar } from '../../src/ui/StatusBar.js';
-import type { WorkingDirDisplay } from '../../src/hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../../src/hooks/useWorkingDirs.js';
 import type { TrunnerRc } from '@trunner/sdk';
 
 function mkRc(tool: 'terraform' | 'opentofu' = 'terraform'): TrunnerRc {
@@ -31,38 +31,38 @@ function mkWs(overrides: Partial<WorkingDirDisplay> & { dir: string }): WorkingD
 }
 
 describe('StatusBar', () => {
-  it('renders the workspace count in the header', () => {
-    const ws = [mkWs({ dir: '/tmp/a' }), mkWs({ dir: '/tmp/b' })];
+  it('renders the working directory count in the header', () => {
+    const wds = [mkWs({ dir: '/tmp/a' }), mkWs({ dir: '/tmp/b' })];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 0 }),
     );
     const frame = lastFrame() ?? '';
     expect(frame).toMatch(/trunner/);
-    expect(frame).toMatch(/2 workspaces/);
+    expect(frame).toMatch(/2 working directories/);
   });
 
-  it('renders a singular workspace count', () => {
-    const ws = [mkWs({ dir: '/tmp/a' })];
+  it('renders a singular working directory count', () => {
+    const wds = [mkWs({ dir: '/tmp/a' })];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 0 }),
     );
-    expect(lastFrame()).toMatch(/1 workspace(?!s)/);
+    expect(lastFrame()).toMatch(/1 working directory/);
   });
 
-  it('renders the discovering placeholder when no workspaces are present', () => {
+  it('renders the discovering placeholder when no working directories are present', () => {
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: [], focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: [], focusedIndex: 0 }),
     );
     expect(lastFrame()).toMatch(/discovering/);
   });
 
   it('shows done / failed states with the right colors and exit codes', () => {
-    const ws = [
+    const wds = [
       mkWs({ dir: '/tmp/a', state: 'exited', exitCode: 0 }),
       mkWs({ dir: '/tmp/b', state: 'exited', exitCode: 2 }),
     ];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 0 }),
     );
     const frame = lastFrame() ?? '';
     expect(frame).toMatch(/done/);
@@ -70,17 +70,17 @@ describe('StatusBar', () => {
   });
 
   it('shows the resolving state with the tool and version', () => {
-    const ws = [mkWs({ dir: '/tmp/a', state: 'resolving', toolId: 'opentofu', version: '1.7.0' })];
+    const wds = [mkWs({ dir: '/tmp/a', state: 'resolving', toolId: 'opentofu', version: '1.7.0' })];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 0 }),
     );
     expect(lastFrame()).toMatch(/resolving \(opentofu 1\.7\.0\)/);
   });
 
-  it('marks the focused workspace with a leading arrow', () => {
-    const ws = [mkWs({ dir: '/tmp/a' }), mkWs({ dir: '/tmp/b' })];
+  it('marks the focused working directory with a leading arrow', () => {
+    const wds = [mkWs({ dir: '/tmp/a' }), mkWs({ dir: '/tmp/b' })];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 1 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 1 }),
     );
     const frame = lastFrame() ?? '';
     const lines = frame.split('\n');
@@ -92,11 +92,11 @@ describe('StatusBar', () => {
 
   it('reports elapsed time using the startedAt / endedAt fields', () => {
     const now = Date.now();
-    const ws = [
+    const wds = [
       mkWs({ dir: '/tmp/a', startedAt: now - 5000, endedAt: now }),
     ];
     const { lastFrame } = render(
-      React.createElement(StatusBar, { workspaces: ws, focusedIndex: 0 }),
+      React.createElement(StatusBar, { workingDirs: wds, focusedIndex: 0 }),
     );
     expect(lastFrame()).toMatch(/5s/);
   });

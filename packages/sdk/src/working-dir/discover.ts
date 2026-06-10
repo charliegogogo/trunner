@@ -3,7 +3,7 @@ import { resolve, basename, join } from 'node:path';
 import type { Dirent } from 'node:fs';
 import { parseRc, type ParseRcWarning, type TrunnerRc } from './trunner-rc.js';
 
-export interface Workspace {
+export interface WorkingDir {
   readonly dir: string;
   readonly config: TrunnerRc;
 }
@@ -23,11 +23,11 @@ const DEFAULT_OPTIONS: Required<Omit<DiscoverOptions, 'onWarning' | 'onSkip'>> =
   exclude: [],
 };
 
-export async function discoverWorkspaces(
+export async function discoverWorkingDirs(
   cwd: string,
   opts: DiscoverOptions = {},
-): Promise<Workspace[]> {
-  const results: Workspace[] = [];
+): Promise<WorkingDir[]> {
+  const results: WorkingDir[] = [];
   const root = resolve(cwd);
   const baseExclude = new Set<string>([...ALWAYS_EXCLUDE, ...(opts.exclude ?? DEFAULT_OPTIONS.exclude)]);
   await walk(root, baseExclude, results, opts);
@@ -37,7 +37,7 @@ export async function discoverWorkspaces(
 async function walk(
   dir: string,
   exclude: Set<string>,
-  results: Workspace[],
+  results: WorkingDir[],
   opts: DiscoverOptions,
 ): Promise<void> {
   if (exclude.has(basename(dir))) return;
@@ -49,7 +49,7 @@ async function walk(
       for (const w of warnings) opts.onWarning?.(w);
       results.push({ dir, config });
     } catch (err) {
-      // A malformed .trunnerrc blocks only its own workspace; siblings continue.
+      // A malformed .trunnerrc blocks only its own working directory; siblings continue.
       opts.onSkip?.({ dir, reason: (err as Error).message });
     }
     return; // project boundary — do not descend

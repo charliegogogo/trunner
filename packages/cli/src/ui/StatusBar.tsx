@@ -1,25 +1,25 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
 
 export interface StatusBarProps {
-  workspaces: WorkingDirDisplay[];
+  workingDirs: WorkingDirDisplay[];
   focusedIndex: number;
 }
 
-function formatState(ws: WorkingDirDisplay): { text: string; color: string } {
-  switch (ws.state) {
+function formatState(wd: WorkingDirDisplay): { text: string; color: string } {
+  switch (wd.state) {
     case 'pending':
       return { text: 'pending', color: 'gray' };
     case 'resolving':
-      return { text: `resolving (${ws.toolId ?? '?'}${ws.version ? ` ${ws.version}` : ''})`, color: 'blue' };
+      return { text: `resolving (${wd.toolId ?? '?'}${wd.version ? ` ${wd.version}` : ''})`, color: 'blue' };
     case 'running': {
-      const phase = ws.progress?.phase ?? 'running';
+      const phase = wd.progress?.phase ?? 'running';
       return { text: phase, color: 'cyan' };
     }
     case 'exited': {
-      if (ws.exitCode === 0) return { text: 'done', color: 'green' };
-      const code = ws.exitCode ?? ws.exitSignal ?? '?';
+      if (wd.exitCode === 0) return { text: 'done', color: 'green' };
+      const code = wd.exitCode ?? wd.exitSignal ?? '?';
       return { text: `failed (exit ${code})`, color: 'red' };
     }
   }
@@ -34,7 +34,7 @@ function formatElapsed(startedAt: number, endedAt: number | null, now: number): 
   return `${m}m${s.toString().padStart(2, '0')}s`;
 }
 
-export function StatusBar({ workspaces, focusedIndex }: StatusBarProps): React.ReactElement {
+export function StatusBar({ workingDirs, focusedIndex }: StatusBarProps): React.ReactElement {
   // Width is owned by Yoga: the outer flex-column root is sized to the
   // terminal by Ink, and width="100%" makes this box fill it. On resize,
   // Ink's internal 'resize' handler calls log.clear() + calculateLayout()
@@ -55,22 +55,22 @@ export function StatusBar({ workspaces, focusedIndex }: StatusBarProps): React.R
     >
       <Box marginBottom={1}>
         <Text bold>trunner</Text>
-        <Text dimColor> · {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'}</Text>
+        <Text dimColor> · {workingDirs.length} working director{workingDirs.length === 1 ? 'y' : 'ies'}</Text>
       </Box>
-      {workspaces.length === 0 ? (
+      {workingDirs.length === 0 ? (
         <Text dimColor>(discovering…)</Text>
       ) : (
-        workspaces.map((ws, i) => {
+        workingDirs.map((wd, i) => {
           const isFocused = i === focusedIndex;
-          const { text: stateText, color: stateColor } = formatState(ws);
-          const elapsed = formatElapsed(ws.startedAt, ws.endedAt, now);
+          const { text: stateText, color: stateColor } = formatState(wd);
+          const elapsed = formatElapsed(wd.startedAt, wd.endedAt, now);
           const marker = isFocused ? '▶' : ' ';
           return (
-            <Box key={ws.dir} flexDirection="row">
+            <Box key={wd.dir} flexDirection="row">
               <Text color={isFocused ? 'green' : undefined}>
                 {marker}{' '}
                 <Text color={isFocused ? 'green' : undefined} bold={isFocused}>
-                  {shortDir(ws.dir)}
+                  {shortDir(wd.dir)}
                 </Text>
                 {' · '}
                 <Text color={stateColor as Parameters<typeof Text>[0]['color']}>{stateText}</Text>
