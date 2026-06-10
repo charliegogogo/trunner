@@ -1,10 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 import type { RunSummary } from '@trunner/sdk';
 
 export interface QuietModeProps {
-  workspaces: WorkspaceDisplay[];
+  workspaces: WorkingDirDisplay[];
   summary: RunSummary | null;
   width: number;
   height: number;
@@ -36,7 +36,7 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
         {summary ? (
           <Text>{summary.total} working director{summary.total === 1 ? 'y' : 'ies'}</Text>
         ) : (
-          <Text dimColor>discovering workspaces...</Text>
+          <Text dimColor>discovering working directories...</Text>
         )}
       </Box>
 
@@ -113,7 +113,7 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
         </Box>
       ) : (
         <Box flexDirection="column" paddingX={1}>
-          <Text dimColor>· discovering workspaces...</Text>
+          <Text dimColor>· discovering working directories...</Text>
         </Box>
       )}
 

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 
-export interface WorkspaceOutputProps {
-  workspace: WorkspaceDisplay;
+export interface WorkingDirOutputProps {
+  workspace: WorkingDirDisplay;
   maxHeight: number;
   width: number;
 }
@@ -19,7 +19,7 @@ function lastNLines(text: string, maxLines: number): string[] {
   return lines.slice(-maxLines);
 }
 
-export function WorkspaceOutput({ workspace, maxHeight, width }: WorkspaceOutputProps): React.ReactElement {
+export function WorkingDirOutput({ workspace, maxHeight, width }: WorkingDirOutputProps): React.ReactElement {
   const { stdout, stderr, state, exitCode } = workspace;
 
   const content = useMemo(() => {

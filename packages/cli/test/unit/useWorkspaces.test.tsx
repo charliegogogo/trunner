@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import React, { useState } from 'react';
 import { render, cleanup } from 'ink-testing-library';
 import { Text } from 'ink';
-import { useWorkspaces } from '../../src/hooks/useWorkspaces.js';
+import { useWorkingDirs } from '../../src/hooks/useWorkspaces.js';
 import type { TrunnerRc, WorkspaceEvent } from '@trunner/sdk';
 
 afterEach(() => {
@@ -19,23 +19,23 @@ async function* makeIter(events: WorkspaceEvent[]): AsyncIterable<WorkspaceEvent
 }
 
 function SnapshotView({
-  workspaces,
+  workingDirs,
   summary,
 }: {
-  workspaces: unknown[];
+  workingDirs: unknown[];
   summary: { total: number; succeeded: number; failed: number } | null;
 }): React.ReactElement {
   return (
     <Text>
-      {workspaces.length}:{summary ? `${summary.succeeded}+${summary.failed}/${summary.total}` : 'no-summary'}
+      {workingDirs.length}:{summary ? `${summary.succeeded}+${summary.failed}/${summary.total}` : 'no-summary'}
     </Text>
   );
 }
 
 function Probe({ events }: { events: WorkspaceEvent[] }): React.ReactElement {
   const [iter] = useState(() => makeIter(events));
-  const r = useWorkspaces(iter);
-  return <SnapshotView workspaces={r.workspaces} summary={r.summary} />;
+  const r = useWorkingDirs(iter);
+  return <SnapshotView workingDirs={r.workingDirs} summary={r.summary} />;
 }
 
 async function waitFor(
@@ -48,18 +48,18 @@ async function waitFor(
   }
 }
 
-describe('useWorkspaces', () => {
+describe('useWorkingDirs', () => {
   it('returns empty state when iter is null', () => {
-    let capturedWorkspaces: unknown[] = [];
+    let capturedWorkingDirs: unknown[] = [];
     let capturedSummary: unknown = null;
     function NullProbe(): React.ReactElement {
-      const r = useWorkspaces(null);
-      capturedWorkspaces = r.workspaces;
+      const r = useWorkingDirs(null);
+      capturedWorkingDirs = r.workingDirs;
       capturedSummary = r.summary;
       return <Text>probe</Text>;
     }
     render(React.createElement(NullProbe));
-    expect(capturedWorkspaces).toEqual([]);
+    expect(capturedWorkingDirs).toEqual([]);
     expect(capturedSummary).toBeNull();
   });
 
@@ -111,11 +111,11 @@ describe('useWorkspaces', () => {
     let answerFn: ((v: string) => void) | null = null;
     function PromptProbe(): React.ReactElement {
       const [iter] = useState(() => makeIter(events));
-      const r = useWorkspaces(iter);
-      if (r.workspaces[0]?.prompt && !answerFn) {
+      const r = useWorkingDirs(iter);
+      if (r.workingDirs[0]?.prompt && !answerFn) {
         answerFn = r.answerFocusedPrompt;
       }
-      return <SnapshotView workspaces={r.workspaces} summary={r.summary} />;
+      return <SnapshotView workingDirs={r.workingDirs} summary={r.summary} />;
     }
     const inst = render(React.createElement(PromptProbe));
     await waitFor(() => answerFn !== null);

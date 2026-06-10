@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 
 export interface ExecutionViewProps {
-  workspaces: WorkspaceDisplay[];
+  workspaces: WorkingDirDisplay[];
   focusedIndex: number;
   scrollOffset: number;
   isComplete: boolean;
@@ -19,7 +19,7 @@ function shortDir(dir: string): string {
   return dir;
 }
 
-function stateIcon(state: WorkspaceDisplay['state'], exitCode: number | null): string {
+function stateIcon(state: WorkingDirDisplay['state'], exitCode: number | null): string {
   if (state === 'exited') {
     return exitCode === 0 ? '✓' : '✗';
   }
@@ -28,7 +28,7 @@ function stateIcon(state: WorkspaceDisplay['state'], exitCode: number | null): s
   return '○';
 }
 
-function stateColor(state: WorkspaceDisplay['state'], exitCode: number | null): Parameters<typeof Text>[0]['color'] {
+function stateColor(state: WorkingDirDisplay['state'], exitCode: number | null): Parameters<typeof Text>[0]['color'] {
   if (state === 'exited') {
     return exitCode === 0 ? 'green' : 'red';
   }

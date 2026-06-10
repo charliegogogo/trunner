@@ -3,8 +3,8 @@ import { EventEmitter } from 'node:events';
 import React, { useRef } from 'react';
 import { render, Box, Text, useBoxMetrics, type DOMElement, type Instance as InkInstance } from 'ink';
 import { StatusBar } from '../../src/ui/StatusBar.js';
-import { WorkspacePane } from '../../src/ui/WorkspacePane.js';
-import type { WorkspaceDisplay } from '../../src/hooks/useWorkspaces.js';
+import { WorkingDirPane } from '../../src/ui/WorkspacePane.js';
+import type { WorkingDirDisplay } from '../../src/hooks/useWorkspaces.js';
 
 type FakeStdout = {
   columns: number;
@@ -86,7 +86,7 @@ function setColumnsAndResize(stdout: FakeStdout, cols: number): void {
   stdout.emit('resize');
 }
 
-function makeWs(dir: string, overrides: Partial<WorkspaceDisplay> = {}): WorkspaceDisplay {
+function makeWs(dir: string, overrides: Partial<WorkingDirDisplay> = {}): WorkingDirDisplay {
   return {
     dir,
     config: { path: `${dir}/.trunnerrc`, tool: 'terraform' },
@@ -246,7 +246,7 @@ describe('resize: useBoxMetrics + WorkspacePane', () => {
       endedAt: Date.now(),
     });
     const inst = trackedRender(
-      <WorkspacePane
+      <WorkingDirPane
         workspace={ws}
         command="plan"
         commandArgs={[]}

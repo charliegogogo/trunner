@@ -1,13 +1,13 @@
 import React, { useRef } from 'react';
 import { Box, Text, useBoxMetrics, useInput, type DOMElement } from 'ink';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 import { ProgressBar } from './ProgressBar.js';
 import { Spinner } from './Spinner.js';
 import { OutputView } from './OutputView.js';
 import { Confirm } from './Confirm.js';
 
-export interface WorkspacePaneProps {
-  workspace: WorkspaceDisplay;
+export interface WorkingDirPaneProps {
+  workspace: WorkingDirDisplay;
   command: string;
   commandArgs: readonly string[];
   autoApprove: boolean;
@@ -18,7 +18,7 @@ export interface WorkspacePaneProps {
   onTab: () => void;
 }
 
-export function WorkspacePane({
+export function WorkingDirPane({
   workspace,
   command,
   commandArgs,
@@ -28,7 +28,7 @@ export function WorkspacePane({
   marginTop,
   onPromptAnswer,
   onTab,
-}: WorkspacePaneProps): React.ReactElement {
+}: WorkingDirPaneProps): React.ReactElement {
   useInput(
     (input, key) => {
       if (!isFocused) return;

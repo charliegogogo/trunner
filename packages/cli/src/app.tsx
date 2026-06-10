@@ -11,7 +11,7 @@ import {
   type WorkspaceEvent,
   type RunSummary,
 } from '@trunner/sdk';
-import { useWorkspaces, type WorkspaceDisplay } from './hooks/useWorkspaces.js';
+import { useWorkingDirs, type WorkingDirDisplay } from './hooks/useWorkspaces.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ExecutionView } from './ui/ExecutionView.js';
 import { StreamView } from './ui/StreamView.js';
@@ -45,16 +45,16 @@ function shortDir(dir: string): string {
   return dir;
 }
 
-function formatResults(workspaces: WorkspaceDisplay[], summary: RunSummary | null, command: string | null): string {
+function formatResults(workingDirs: WorkingDirDisplay[], summary: RunSummary | null, command: string | null): string {
   const GREEN = '\x1b[32m';
   const RED = '\x1b[31m';
   const BOLD = '\x1b[1m';
   const DIM = '\x1b[2m';
   const RESET = '\x1b[0m';
 
-  const total = summary?.total ?? workspaces.length;
-  const succeeded = summary?.succeeded ?? workspaces.filter((w) => w.exitCode === 0).length;
-  const failed = summary?.failed ?? workspaces.filter((w) => w.exitCode !== 0).length;
+  const total = summary?.total ?? workingDirs.length;
+  const succeeded = summary?.succeeded ?? workingDirs.filter((w) => w.exitCode === 0).length;
+  const failed = summary?.failed ?? workingDirs.filter((w) => w.exitCode !== 0).length;
 
   const lines: string[] = [];
   lines.push('');
@@ -70,12 +70,12 @@ function formatResults(workspaces: WorkspaceDisplay[], summary: RunSummary | nul
 
   // Table header
   const now = Date.now();
-  const dirWidth = Math.max(20, ...workspaces.map((w) => shortDir(w.dir).length));
+  const dirWidth = Math.max(20, ...workingDirs.map((w) => shortDir(w.dir).length));
   lines.push(`${BOLD}${'Working Directory'.padEnd(dirWidth)}  ${'Status'.padEnd(12)}  ${'Result'}${RESET}`);
   lines.push(`${'─'.repeat(dirWidth)}  ${'─'.repeat(12)}  ${'─'.repeat(30)}`);
 
   // Table rows
-  for (const ws of workspaces) {
+  for (const ws of workingDirs) {
     const elapsed = ws.endedAt ? ws.endedAt - ws.startedAt : now - ws.startedAt;
     const elapsedStr = (elapsed / 1000).toFixed(1) + 's';
     const dir = shortDir(ws.dir);
@@ -134,7 +134,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
   const [scrollOffset, setScrollOffset] = useState(0);
   const { width: termWidth, height: termHeight } = useTerminalSize();
 
-  const { workspaces, summary, moveFocus } = useWorkspaces(
+  const { workingDirs, summary, moveFocus } = useWorkingDirs(
     iter,
     {
       onDone: (s) => {
@@ -202,7 +202,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
       // Exit on Esc (only when done or error)
       if (key.escape && (state.phase === 'done' || state.phase === 'error')) {
         if (state.phase === 'done') {
-          onExit?.(formatResults(workspaces, summary ?? state.summary, command));
+          onExit?.(formatResults(workingDirs, summary ?? state.summary, command));
         } else if (state.error) {
           onExit?.(`error: ${state.error}`);
         }
@@ -216,7 +216,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
           setScrollOffset(0);
         }
         if (key.rightArrow) {
-          setFocusedIndex((prev) => Math.min(workspaces.length - 1, prev + 1));
+          setFocusedIndex((prev) => Math.min(workingDirs.length - 1, prev + 1));
           setScrollOffset(0);
         }
       }
@@ -224,7 +224,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
       // Scroll output: ↑ scroll up (older content), ↓ scroll down (newer content)
       // Cap scrollOffset so it can't exceed the total lines beyond the top
       if (key.upArrow) {
-        const focusedWs = workspaces[focusedIndex];
+        const focusedWs = workingDirs[focusedIndex];
         const outputHeight = termHeight - 6;
         const totalLines = focusedWs
           ? (focusedWs.stdout + (focusedWs.stderr ? `\n${focusedWs.stderr}` : '')).split('\n').length
@@ -268,7 +268,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
         >
           <Text bold color="magenta">trunner</Text>
           <Text dimColor> │ </Text>
-          <Text dimColor>discovering workspaces...</Text>
+          <Text dimColor>discovering working directories...</Text>
         </Box>
       </Box>
     );
@@ -276,7 +276,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
 
   return (
     <ExecutionView
-      workspaces={workspaces}
+      workspaces={workingDirs}
       focusedIndex={focusedIndex}
       scrollOffset={scrollOffset}
       isComplete={state.phase === 'done'}
@@ -349,7 +349,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
 
     // Show ExecutionView if in run category with command selected
     if (interactiveCategory === 'run' && selectedCommand && selectedTool) {
-      // When "mixed" is selected, don't pass tool override - let each workspace use its own tool
+      // When "mixed" is selected, don't pass tool override - let each working directory use its own tool
       const toolOverride = selectedTool === 'mixed' ? undefined : selectedTool;
       // Use ExecutionView (carousel) for interactive mode - don't recurse into a new App
       // which would use the non-interactive path and auto-exit
@@ -392,10 +392,10 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   const { isRawModeSupported } = useStdin();
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const { workspaces, summary, moveFocus } = useWorkspaces(
+  const { workingDirs, summary, moveFocus } = useWorkingDirs(
     iter,
     {
-      onDone: (s) => {
+      onDone: (s: RunSummary) => {
         setState((cur) => ({ ...cur, phase: 'done', summary: s }));
       },
     },
@@ -460,7 +460,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       // Exit on Esc
       if (key.escape && (state.phase === 'done' || state.phase === 'error')) {
         if (state.phase === 'done') {
-          onExit?.(formatResults(workspaces, summary ?? state.summary, command));
+          onExit?.(formatResults(workingDirs, summary ?? state.summary, command));
         } else if (state.error) {
           onExit?.(`error: ${state.error}`);
         }
@@ -470,13 +470,13 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       // Tab switching with arrow keys (for interactive mode's recursive call)
       if (state.phase === 'running' || state.phase === 'done') {
         if (key.leftArrow) {
-          // Previous workspace
+          // Previous working directory
           setFocusedIndex((prev) => Math.max(0, prev - 1));
           setScrollOffset(0);
         }
         if (key.rightArrow) {
-          // Next workspace
-          setFocusedIndex((prev) => Math.min(workspaces.length - 1, prev + 1));
+          // Next working directory
+          setFocusedIndex((prev) => Math.min(workingDirs.length - 1, prev + 1));
           setScrollOffset(0);
         }
       }
@@ -484,7 +484,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       // Scroll output: ↑ scroll up (older content), ↓ scroll down (newer content)
       // Cap scrollOffset so it can't exceed the total lines beyond the top
       if (key.upArrow) {
-        const focusedWs = workspaces[focusedIndex];
+        const focusedWs = workingDirs[focusedIndex];
         const outputHeight = termHeight - 6;
         const totalLines = focusedWs
           ? (focusedWs.stdout + (focusedWs.stderr ? `\n${focusedWs.stderr}` : '')).split('\n').length
@@ -513,12 +513,12 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       process.exitCode = s && s.failed > 0 ? 1 : 0;
       // Non-interactive mode: auto-exit after completion
       const t = setTimeout(() => {
-        onExit?.(formatResults(workspaces, summary ?? state.summary, command));
+        onExit?.(formatResults(workingDirs, summary ?? state.summary, command));
         ink.exit();
       }, 1000);
       return () => clearTimeout(t);
     }
-  }, [state.phase, state.summary, summary, ink, workspaces, onExit]);
+  }, [state.phase, state.summary, summary, ink, workingDirs, onExit]);
 
   if (state.phase === 'error') {
     return (
@@ -538,7 +538,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   if (state.phase === 'discovering') {
     return (
       <Box flexDirection="column" width={termWidth}>
-        <Text dimColor> discovering workspaces...</Text>
+        <Text dimColor> discovering working directories...</Text>
       </Box>
     );
   }
@@ -546,7 +546,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   // Show StreamView for both running and done phases (streaming output with prefixes)
   return (
     <StreamView
-      workspaces={workspaces}
+      workspaces={workingDirs}
       cwd={flags.cwd}
       command={command}
       summary={summary ?? state.summary}

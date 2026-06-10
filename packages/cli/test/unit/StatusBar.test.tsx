@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { StatusBar } from '../../src/ui/StatusBar.js';
-import type { WorkspaceDisplay } from '../../src/hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../../src/hooks/useWorkspaces.js';
 import type { TrunnerRc } from '@trunner/sdk';
 
 function mkRc(tool: 'terraform' | 'opentofu' = 'terraform'): TrunnerRc {
   return { path: '/tmp/ws/.trunnerrc', tool };
 }
 
-function mkWs(overrides: Partial<WorkspaceDisplay> & { dir: string }): WorkspaceDisplay {
+function mkWs(overrides: Partial<WorkingDirDisplay> & { dir: string }): WorkingDirDisplay {
   return {
     dir: overrides.dir,
     config: overrides.config ?? mkRc(),

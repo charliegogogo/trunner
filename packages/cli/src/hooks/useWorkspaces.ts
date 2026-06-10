@@ -10,12 +10,12 @@ import type {
   ParsedSummary,
 } from '@trunner/sdk';
 
-export type WorkspaceState = 'pending' | 'resolving' | 'running' | 'exited';
+export type WorkingDirState = 'pending' | 'resolving' | 'running' | 'exited';
 
-export interface WorkspaceDisplay {
+export interface WorkingDirDisplay {
   readonly dir: string;
   readonly config: TrunnerRc;
-  state: WorkspaceState;
+  state: WorkingDirState;
   toolId: string | null;
   version: string | null;
   stdout: string;
@@ -31,8 +31,8 @@ export interface WorkspaceDisplay {
   parsedResult: ParsedSummary | null;
 }
 
-export interface UseWorkspacesResult {
-  workspaces: WorkspaceDisplay[];
+export interface UseWorkingDirsResult {
+  workingDirs: WorkingDirDisplay[];
   focusedIndex: number;
   setFocusedIndex: (i: number) => void;
   moveFocus: (delta: number) => void;
@@ -40,11 +40,11 @@ export interface UseWorkspacesResult {
   summary: RunSummary | null;
 }
 
-export interface UseWorkspacesOptions {
+export interface UseWorkingDirsOptions {
   onDone?: (summary: RunSummary) => void;
 }
 
-function initial(dir: string, config: TrunnerRc): WorkspaceDisplay {
+function initial(dir: string, config: TrunnerRc): WorkingDirDisplay {
   return {
     dir,
     config,
@@ -75,11 +75,11 @@ function progressPercentOf(info: ProgressInfo): number {
   return 0;
 }
 
-export function useWorkspaces(
+export function useWorkingDirs(
   iter: AsyncIterable<WorkspaceEvent> | null,
-  options: UseWorkspacesOptions = {},
-): UseWorkspacesResult {
-  const [workspaces, setWorkspaces] = useState<WorkspaceDisplay[]>([]);
+  options: UseWorkingDirsOptions = {},
+): UseWorkingDirsResult {
+  const [workingDirs, setWorkingDirs] = useState<WorkingDirDisplay[]>([]);
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const promptAnswersRef = useRef<Map<string, PromptAnswer>>(new Map());
@@ -88,12 +88,12 @@ export function useWorkspaces(
 
   useEffect(() => {
     if (!iter) {
-      setWorkspaces([]);
+      setWorkingDirs([]);
       setSummary(null);
       return;
     }
 
-    setWorkspaces([]);
+    setWorkingDirs([]);
     setSummary(null);
     promptAnswersRef.current.clear();
 
@@ -104,9 +104,9 @@ export function useWorkspaces(
         for await (const e of iter) {
           if (cancelled) return;
           if (e.kind === 'started') {
-            setWorkspaces((prev) => [...prev, initial(e.workspace.dir, e.workspace.config)]);
+            setWorkingDirs((prev) => [...prev, initial(e.workspace.dir, e.workspace.config)]);
           } else if (e.kind === 'resolving') {
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) =>
                 w.dir === e.workspace.dir
                   ? { ...w, state: 'resolving', toolId: e.toolId, version: e.version }
@@ -114,7 +114,7 @@ export function useWorkspaces(
               ),
             );
           } else if (e.kind === 'stdout') {
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) =>
                 w.dir === e.workspace.dir
                   ? { ...w, stdout: w.stdout + e.chunk, state: 'running' as const }
@@ -122,7 +122,7 @@ export function useWorkspaces(
               ),
             );
           } else if (e.kind === 'stderr') {
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) =>
                 w.dir === e.workspace.dir
                   ? { ...w, stderr: w.stderr + e.chunk, state: 'running' as const }
@@ -130,7 +130,7 @@ export function useWorkspaces(
               ),
             );
           } else if (e.kind === 'progress') {
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) =>
                 w.dir === e.workspace.dir
                   ? {
@@ -145,7 +145,7 @@ export function useWorkspaces(
             );
           } else if (e.kind === 'prompt') {
             promptAnswersRef.current.set(e.workspace.dir, e.answer);
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) =>
                 w.dir === e.workspace.dir
                   ? { ...w, prompt: { req: e.req, answer: e.answer } }
@@ -153,7 +153,7 @@ export function useWorkspaces(
               ),
             );
           } else if (e.kind === 'exited') {
-            setWorkspaces((prev) =>
+            setWorkingDirs((prev) =>
               prev.map((w) => {
                 if (w.dir !== e.workspace.dir) return w;
                 const parsedResult = parsePlanAndApplyOutput(w.stdout, w.stderr, { includeDiagnostics: e.code !== 0 });
@@ -177,7 +177,7 @@ export function useWorkspaces(
       } catch (err) {
         if (!cancelled) {
           // eslint-disable-next-line no-console
-          console.error('useWorkspaces: iterator error', err);
+          console.error('useWorkingDirs: iterator error', err);
         }
       }
     })();
@@ -197,17 +197,17 @@ export function useWorkspaces(
 
   const answerFocusedPrompt = useCallback(
     (value: string) => {
-      const focused = workspaces[focusedIndex];
+      const focused = workingDirs[focusedIndex];
       if (focused) {
         const answer = promptAnswersRef.current.get(focused.dir);
         if (answer) answer(value);
       }
     },
-    [workspaces, focusedIndex],
+    [workingDirs, focusedIndex],
   );
 
   return {
-    workspaces,
+    workingDirs,
     focusedIndex,
     setFocusedIndex: setFocused,
     moveFocus,

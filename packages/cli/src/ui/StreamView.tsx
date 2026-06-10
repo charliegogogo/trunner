@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { Box } from 'ink';
 import { relative } from 'node:path';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 import type { RunSummary } from '@trunner/sdk';
 import { getWorkspaceAnsiColor } from '../utils/colors.js';
 
 export interface StreamViewProps {
-  workspaces: WorkspaceDisplay[];
+  workspaces: WorkingDirDisplay[];
   cwd: string;
   command: string | null;
   summary: RunSummary | null;
@@ -38,7 +38,7 @@ export function StreamView({
 }: StreamViewProps): React.ReactElement {
   const total = workspaces.length;
 
-  // Track byte offset into w.stdout for each workspace — not line count,
+  // Track byte offset into w.stdout for each working directory — not line count,
   // because a partial line (no trailing \n) can grow when the next chunk
   // arrives, keeping the line-count the same while adding printable content.
   const offsetRef = useRef<Map<string, number>>(new Map());

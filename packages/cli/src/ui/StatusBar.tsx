@@ -1,13 +1,13 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { WorkspaceDisplay } from '../hooks/useWorkspaces.js';
+import type { WorkingDirDisplay } from '../hooks/useWorkspaces.js';
 
 export interface StatusBarProps {
-  workspaces: WorkspaceDisplay[];
+  workspaces: WorkingDirDisplay[];
   focusedIndex: number;
 }
 
-function formatState(ws: WorkspaceDisplay): { text: string; color: string } {
+function formatState(ws: WorkingDirDisplay): { text: string; color: string } {
   switch (ws.state) {
     case 'pending':
       return { text: 'pending', color: 'gray' };

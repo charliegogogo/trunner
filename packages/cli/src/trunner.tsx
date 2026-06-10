@@ -115,10 +115,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Non-interactive mode: run a tool command across all discovered workspaces.
+  // Non-interactive mode: run a tool command across all discovered working directories.
   const flags: CliFlags = parseFlags(cli);
 
-  // JSON mode: emit one JSON line per workspace event (no TUI)
+  // JSON mode: emit one JSON line per working directory event (no TUI)
   if (flags.json) {
     await runJsonMode(verb, subArgs, flags);
     return;
@@ -192,7 +192,7 @@ function serializeEvent(event: import('@trunner/sdk').WorkspaceEvent): Record<st
     };
   }
 
-  // For events with workspace, include dir and config
+  // For events with working directory, include dir and config
   if ('workspace' in event) {
     const { workspace, ...rest } = event;
     return {
