@@ -28,7 +28,7 @@ export interface AppProps {
   onExit?: (results: string) => void;
 }
 
-type Phase = 'discovering' | 'running' | 'done' | 'error';
+type Phase = 'discovering' | 'running' | 'done' | 'error' | 'executing';
 
 interface DiscoverState {
   phase: Phase;
@@ -108,6 +108,184 @@ function formatResults(workspaces: WorkspaceDisplay[], summary: RunSummary | nul
   return lines.join('\n');
 }
 
+interface InteractiveExecutionProps {
+  command: string;
+  commandArgs: string[];
+  flags: CliFlags;
+  onExit?: (results: string) => void;
+}
+
+/**
+ * InteractiveExecution handles running commands in interactive mode.
+ * It discovers workspaces, runs commands, and shows the ExecutionView (carousel).
+ * Unlike the non-interactive path, it does NOT auto-exit - user presses Esc to exit.
+ */
+function InteractiveExecution({ command, commandArgs, flags, onExit }: InteractiveExecutionProps): React.ReactElement {
+  const [state, setState] = useState<DiscoverState>({
+    phase: 'discovering',
+    workspaces: [],
+    error: null,
+    summary: null,
+  });
+  const [iter, setIter] = useState<AsyncIterable<WorkspaceEvent> | null>(null);
+  const ink = useApp();
+  const { isRawModeSupported } = useStdin();
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const { width: termWidth, height: termHeight } = useTerminalSize();
+
+  const { workspaces, summary, moveFocus } = useWorkspaces(
+    iter,
+    {
+      onDone: (s) => {
+        setState((cur) => ({ ...cur, phase: 'done', summary: s }));
+      },
+    },
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ws = await discoverWorkspaces(flags.cwd, { exclude: flags.exclude });
+        if (cancelled) return;
+        if (ws.length === 0) {
+          const cwdAbs = resolvePath(flags.cwd);
+          const cwdRc = rcPathFor(cwdAbs);
+          let parseError: string | null = null;
+          try {
+            const st = await stat(cwdRc);
+            if (st.isFile()) {
+              await parseRc(cwdRc);
+            }
+          } catch (err) {
+            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+              parseError = (err as Error).message;
+            }
+          }
+          const msg = parseError
+            ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
+            : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
+          setState({
+            phase: 'error',
+            workspaces: [],
+            error: msg,
+            summary: null,
+          });
+          return;
+        }
+        setState((cur) => ({ ...cur, phase: 'running', workspaces: ws }));
+        const it = runWorkspaces(ws, command, commandArgs, {
+          ...(typeof flags.concurrency === 'number' ? { concurrency: flags.concurrency } : {}),
+          ...(flags.toolVersion ? { toolVersionRef: flags.toolVersion } : {}),
+          ...(flags.tool ? { toolOverride: flags.tool } : {}),
+          autoApprove: flags.autoApprove,
+        });
+        setIter(it);
+      } catch (err) {
+        if (cancelled) return;
+        setState({
+          phase: 'error',
+          workspaces: [],
+          error: (err as Error).message,
+          summary: null,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [command, commandArgs, flags.cwd, flags.exclude, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+
+  useInput(
+    (_input, key) => {
+      // Exit on Esc (only when done or error)
+      if (key.escape && (state.phase === 'done' || state.phase === 'error')) {
+        if (state.phase === 'done') {
+          onExit?.(formatResults(workspaces, summary ?? state.summary, command));
+        } else if (state.error) {
+          onExit?.(`error: ${state.error}`);
+        }
+        ink.exit();
+      }
+
+      // Tab switching with arrow keys
+      if (state.phase === 'running' || state.phase === 'done') {
+        if (key.leftArrow) {
+          setFocusedIndex((prev) => Math.max(0, prev - 1));
+          setScrollOffset(0);
+        }
+        if (key.rightArrow) {
+          setFocusedIndex((prev) => Math.min(workspaces.length - 1, prev + 1));
+          setScrollOffset(0);
+        }
+      }
+
+      // Scroll output: ↑ scroll up (older content), ↓ scroll down (newer content)
+      // Cap scrollOffset so it can't exceed the total lines beyond the top
+      if (key.upArrow) {
+        const focusedWs = workspaces[focusedIndex];
+        const outputHeight = termHeight - 6;
+        const totalLines = focusedWs
+          ? (focusedWs.stdout + (focusedWs.stderr ? `\n${focusedWs.stderr}` : '')).split('\n').length
+          : 0;
+        const maxOffset = Math.max(0, totalLines - outputHeight);
+        setScrollOffset((prev) => Math.min(maxOffset, prev + 1));
+      }
+      if (key.downArrow) {
+        setScrollOffset((prev) => Math.max(0, prev - 1));
+      }
+    },
+    { isActive: isRawModeSupported === true },
+  );
+
+  if (state.phase === 'error') {
+    return (
+      <Box flexDirection="column" width={termWidth} height={termHeight}>
+        <Box
+          borderStyle="round"
+          borderColor="red"
+          paddingX={1}
+          width={termWidth}
+        >
+          <Text color="red">error: {state.error}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Press Esc to exit</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (state.phase === 'discovering') {
+    return (
+      <Box flexDirection="column" width={termWidth} height={termHeight}>
+        <Box
+          borderStyle="round"
+          borderColor="magenta"
+          paddingX={1}
+          width={termWidth}
+        >
+          <Text bold color="magenta">trunner</Text>
+          <Text dimColor> │ </Text>
+          <Text dimColor>discovering workspaces...</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  return (
+    <ExecutionView
+      workspaces={workspaces}
+      focusedIndex={focusedIndex}
+      scrollOffset={scrollOffset}
+      isComplete={state.phase === 'done'}
+      width={termWidth}
+      height={termHeight}
+    />
+  );
+}
+
 export function App({ command, commandArgs, flags, interactiveMode, onExit }: AppProps): React.ReactElement {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [defaultRc, setDefaultRc] = useState<any>(null);
@@ -173,12 +351,13 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     if (interactiveCategory === 'run' && selectedCommand && selectedTool) {
       // When "mixed" is selected, don't pass tool override - let each workspace use its own tool
       const toolOverride = selectedTool === 'mixed' ? undefined : selectedTool;
+      // Use ExecutionView (carousel) for interactive mode - don't recurse into a new App
+      // which would use the non-interactive path and auto-exit
       return (
-        <App
+        <InteractiveExecution
           command={selectedCommand}
           commandArgs={commandArgs}
           flags={{ ...flags, ...(toolOverride ? { tool: toolOverride } : {}) }}
-          interactiveMode={false}
           onExit={onExit}
         />
       );
@@ -302,11 +481,18 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         }
       }
 
-      // Scroll output with arrow keys
-      if (_input === 'j' || key.downArrow) {
-        setScrollOffset((prev) => prev + 1);
+      // Scroll output: ↑ scroll up (older content), ↓ scroll down (newer content)
+      // Cap scrollOffset so it can't exceed the total lines beyond the top
+      if (key.upArrow) {
+        const focusedWs = workspaces[focusedIndex];
+        const outputHeight = termHeight - 6;
+        const totalLines = focusedWs
+          ? (focusedWs.stdout + (focusedWs.stderr ? `\n${focusedWs.stderr}` : '')).split('\n').length
+          : 0;
+        const maxOffset = Math.max(0, totalLines - outputHeight);
+        setScrollOffset((prev) => Math.min(maxOffset, prev + 1));
       }
-      if (_input === 'k' || key.upArrow) {
+      if (key.downArrow) {
         setScrollOffset((prev) => Math.max(0, prev - 1));
       }
     },
