@@ -49,13 +49,22 @@ export function QuietMode({ workspaces, summary, width, height }: QuietModeProps
             if (ws.state === 'exited') {
               if (ws.exitCode === 0 && ws.parsedResult?.changes) {
                 const { add, change, destroy } = ws.parsedResult.changes;
+                const resultType = ws.parsedResult.resultType ?? 'plan';
+                let resultText: string;
+                if (resultType === 'apply') {
+                  resultText = `Apply complete! Resources: ${add} added, ${change} changed, ${destroy} destroyed.`;
+                } else if (resultType === 'destroy') {
+                  resultText = `Destroy complete! Resources: ${destroy} destroyed.`;
+                } else {
+                  resultText = `Plan: ${add} to add, ${change} to change, ${destroy} to destroy.`;
+                }
                 return (
                   <Box key={ws.dir} flexDirection="row">
                     <Text color="magenta">✓</Text>
                     <Text> </Text>
                     <Text bold>{shortDir(ws.dir)}</Text>
                     <Text dimColor>: </Text>
-                    <Text color="green">Plan: {add} to add, {change} to change, {destroy} to destroy.</Text>
+                    <Text color="green">{resultText}</Text>
                     <Text dimColor> ({elapsedStr})</Text>
                   </Box>
                 );

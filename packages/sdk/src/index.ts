@@ -67,6 +67,7 @@ export type {
   CommandOptions,
   CommandResult,
   ParsedSummary,
+  ResultType,
   ChangeCounts,
   ResultStatus,
   ProgressInfo,

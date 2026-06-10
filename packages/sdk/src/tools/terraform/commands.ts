@@ -5,15 +5,16 @@ const COMMANDS: CommandSpec[] = [
     name: 'init',
     description: 'Initialize a Terraform working directory.',
     args: [
-      { flags: ['-input'], description: 'Ask for input if necessary.', takesValue: false, default: true },
+      { flags: ['-input=false'], description: 'Disable interactive input.', takesValue: false, default: true },
       { flags: ['-upgrade'], description: 'Upgrade modules and plugins.', takesValue: false, default: false },
     ],
-    env: [{ key: 'TF_INPUT', description: 'Disable interactive input (set to "0" or "false").' }],
+    env: [],
   },
   {
     name: 'plan',
     description: 'Generate and show an execution plan.',
     args: [
+      { flags: ['-input=false'], description: 'Disable interactive input.', takesValue: false, default: true },
       { flags: ['-out'], description: 'Write the plan to a given file.', takesValue: true },
       { flags: ['-destroy'], description: 'Create a destroy plan.', takesValue: false, default: false },
     ],
@@ -24,10 +25,10 @@ const COMMANDS: CommandSpec[] = [
     name: 'apply',
     description: 'Apply the changes required to reach the desired state.',
     args: [
-      { flags: ['-auto-approve'], description: 'Skip interactive approval.', takesValue: false, default: false },
-      { flags: ['-input'], description: 'Ask for input if necessary.', takesValue: false, default: true },
+      { flags: ['-auto-approve'], description: 'Skip interactive approval.', takesValue: false, default: true },
+      { flags: ['-input=false'], description: 'Disable interactive input.', takesValue: false, default: true },
     ],
-    env: [{ key: 'TF_INPUT', description: 'Disable interactive input.' }],
+    env: [],
     requiresConfirmation: true,
     autoApproveFlag: '-auto-approve',
   },
@@ -35,7 +36,8 @@ const COMMANDS: CommandSpec[] = [
     name: 'destroy',
     description: 'Destroy Terraform-managed infrastructure.',
     args: [
-      { flags: ['-auto-approve'], description: 'Skip interactive approval.', takesValue: false, default: false },
+      { flags: ['-auto-approve'], description: 'Skip interactive approval.', takesValue: false, default: true },
+      { flags: ['-input=false'], description: 'Disable interactive input.', takesValue: false, default: true },
     ],
     env: [],
     requiresConfirmation: true,
@@ -90,7 +92,6 @@ class TerraformCommandRegistry implements CommandRegistry {
     const out: string[] = [name];
 
     for (const a of spec.args) {
-      // Skip flags whose value was not provided; only set defaults that are truthy.
       if (a.takesValue) {
         const provided = findArgValue(opts.args, a.flags);
         if (provided !== undefined) {
@@ -103,8 +104,8 @@ class TerraformCommandRegistry implements CommandRegistry {
         out.push(a.flags[0]!);
         continue;
       }
-      if (opts.autoApprove && a.flags.includes(spec.autoApproveFlag ?? '')) {
-        out.push(spec.autoApproveFlag!);
+      if (a.default) {
+        out.push(a.flags[0]!);
       }
     }
 

@@ -82,7 +82,15 @@ function formatResults(workspaces: WorkspaceDisplay[], summary: RunSummary | nul
     if (ws.state === 'exited') {
       if (ws.exitCode === 0 && ws.parsedResult?.changes) {
         const { add, change, destroy } = ws.parsedResult.changes;
-        const result = `Plan: ${add} to add, ${change} to change, ${destroy} to destroy.`;
+        const resultType = ws.parsedResult.resultType ?? 'plan';
+        let result: string;
+        if (resultType === 'apply') {
+          result = `Apply complete! Resources: ${add} added, ${change} changed, ${destroy} destroyed.`;
+        } else if (resultType === 'destroy') {
+          result = `Destroy complete! Resources: ${destroy} destroyed.`;
+        } else {
+          result = `Plan: ${add} to add, ${change} to change, ${destroy} to destroy.`;
+        }
         lines.push(`${GREEN}${dir.padEnd(dirWidth)}  ${'✓ success'.padEnd(12)}  ${result} ${DIM}(${elapsedStr})${RESET}`);
       } else if (ws.exitCode === 0) {
         lines.push(`${GREEN}${dir.padEnd(dirWidth)}  ${'✓ success'.padEnd(12)}  ${DIM}(${elapsedStr})${RESET}`);

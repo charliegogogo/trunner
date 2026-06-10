@@ -199,5 +199,6 @@ function detectPrompt(chunk: string, stream: RunnerStream): void {
 function buildEnv(spec: RunSpec, opts: InternalOptions): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...spec.env };
   env.TF_PLUGIN_CACHE_DIR = join(opts.paths.providers, 'terraform', 'plugins');
+  env.TF_IN_AUTOMATION = '1';
   return env;
 }

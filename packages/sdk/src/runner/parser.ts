@@ -1,4 +1,4 @@
-import type { ChangeCounts, ParsedSummary } from '../types/result.js';
+import type { ChangeCounts, ParsedSummary, ResultType } from '../types/result.js';
 
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
 
@@ -25,6 +25,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
 
   const planMatch = clean.match(PLAN_RE);
   if (planMatch) {
+    summary.resultType = 'plan';
     const counts: ChangeCounts = {
       add: Number.parseInt(planMatch[1]!, 10),
       change: Number.parseInt(planMatch[2]!, 10),
@@ -33,12 +34,13 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
     counts.total = counts.add + counts.change + counts.destroy;
     summary.changes = counts;
   } else {
-    const destroyMatch = clean.match(PLAN_DESTROY_RE);
-    if (destroyMatch) {
+    const destroyPlanMatch = clean.match(PLAN_DESTROY_RE);
+    if (destroyPlanMatch) {
+      summary.resultType = 'plan';
       const counts: ChangeCounts = {
         add: 0,
         change: 0,
-        destroy: Number.parseInt(destroyMatch[1]!, 10),
+        destroy: Number.parseInt(destroyPlanMatch[1]!, 10),
       };
       counts.total = counts.destroy;
       summary.changes = counts;
@@ -47,6 +49,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
 
   const applyMatch = clean.match(APPLY_RESULT_RE);
   if (applyMatch) {
+    summary.resultType = 'apply';
     const counts: ChangeCounts = {
       add: Number.parseInt(applyMatch[1]!, 10),
       change: Number.parseInt(applyMatch[2]!, 10),
@@ -58,6 +61,7 @@ export function parsePlanAndApplyOutput(stdout: string, stderr: string, opts: Pa
 
   const destroyMatch = clean.match(DESTROY_RESULT_RE);
   if (destroyMatch) {
+    summary.resultType = 'destroy';
     const counts: ChangeCounts = {
       add: 0,
       change: 0,

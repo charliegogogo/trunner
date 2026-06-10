@@ -7,7 +7,10 @@ export interface CommandResult {
   parsed?: ParsedSummary;
 }
 
+export type ResultType = 'plan' | 'apply' | 'destroy';
+
 export interface ParsedSummary {
+  resultType?: ResultType;
   changes?: ChangeCounts;
   rawLines?: number;
   errors?: string[];

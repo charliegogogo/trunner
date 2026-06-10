@@ -20,12 +20,17 @@ describe('terraform/commands', () => {
 
   it('buildInvocation includes user-provided flags', () => {
     const inv = terraformCommands.buildInvocation('plan', { args: ['-out', 'tfplan'] });
-    expect(inv).toEqual(['plan', '-out', 'tfplan']);
+    expect(inv).toEqual(['plan', '-input=false', '-out', 'tfplan']);
   });
 
-  it('buildInvocation auto-injects -auto-approve when autoApprove=true', () => {
-    const inv = terraformCommands.buildInvocation('apply', { autoApprove: true });
-    expect(inv).toEqual(['apply', '-auto-approve']);
+  it('buildInvocation auto-injects -auto-approve and -input=false for apply', () => {
+    const inv = terraformCommands.buildInvocation('apply', {});
+    expect(inv).toEqual(['apply', '-auto-approve', '-input=false']);
+  });
+
+  it('buildInvocation auto-injects -auto-approve and -input=false for destroy', () => {
+    const inv = terraformCommands.buildInvocation('destroy', {});
+    expect(inv).toEqual(['destroy', '-auto-approve', '-input=false']);
   });
 
   it('buildInvocation does not duplicate user-supplied -auto-approve', () => {
@@ -35,7 +40,7 @@ describe('terraform/commands', () => {
 
   it('buildInvocation appends extraArgs at the end', () => {
     const inv = terraformCommands.buildInvocation('init', { extraArgs: ['-no-color'] });
-    expect(inv).toEqual(['init', '-no-color']);
+    expect(inv).toEqual(['init', '-input=false', '-no-color']);
   });
 
   it('buildInvocation throws on unknown commands', () => {
