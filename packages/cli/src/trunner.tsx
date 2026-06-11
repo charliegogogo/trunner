@@ -6,6 +6,7 @@ import { renderToolsCommand } from './commands/tools.js';
 import { renderProvidersCommand } from './commands/providers.js';
 import { discoverWorkingDirs, runWorkingDirs } from '@trunner/sdk';
 import type { CliFlags, CliSubcommand } from './types.js';
+import { parseExcludeWorkingDirs, filterExcludedWorkingDirs } from './utils/exclude-dirs.js';
 
 const cli = meow(
   `
@@ -26,6 +27,7 @@ const cli = meow(
        --mirror <url>            Override the default terraform + provider mirror (Phase 2B)
        --concurrency <n>         Max working directories running in parallel (default: os.cpus().length)
        --exclude <dir>           Add <dir> to the scan's exclude set (repeatable)
+       --exclude-working-dirs <dirs>  Comma-separated relative paths of working dirs to exclude (e.g. "dir1,dir2/subdir")
        --no-alt-screen           Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals)
        --json                    Emit one JSON line per working directory event (CI-friendly; no TUI)
        --quiet                   Suppress the status bar; emit only the final summary
@@ -41,6 +43,7 @@ const cli = meow(
       $ trunner plan -t opentofu
       $ trunner plan --concurrency 1
       $ trunner plan --exclude vendor
+      $ trunner plan --exclude-working-dirs "terraform_data_test,nested/terraform_data_test_nested"
   `,
   {
     importMeta: import.meta,
@@ -55,6 +58,7 @@ const cli = meow(
       mirror: { type: 'string' },
       concurrency: { type: 'string' },
       exclude: { type: 'string', isMultiple: true, default: [] },
+      excludeWorkingDirs: { type: 'string' },
       json: { type: 'boolean', default: false },
       quiet: { type: 'boolean', default: false },
       autoApprove: { type: 'boolean', default: false },
@@ -153,10 +157,18 @@ async function main(): Promise<void> {
  * Ideal for CI/CD pipelines and AI agent consumption.
  */
 async function runJsonMode(command: string, args: string[], flags: CliFlags): Promise<void> {
-  const workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+  let workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+
+  // Filter out excluded working directories
+  const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
+  if (excludedPaths.length > 0) {
+    workingDirs = filterExcludedWorkingDirs(workingDirs, flags.cwd, excludedPaths);
+  }
 
   if (workingDirs.length === 0) {
-    const msg = `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
+    const msg = excludedPaths.length > 0
+      ? `all discovered working directories were excluded by --exclude-working-dirs`
+      : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
     process.stderr.write(JSON.stringify({ kind: 'error', message: msg }) + '\n');
     process.exit(1);
   }
@@ -249,6 +261,7 @@ function parseFlags(cli: { flags: Record<string, unknown> }): CliFlags {
     mirror: typeof f.mirror === 'string' ? f.mirror : undefined,
     concurrency,
     exclude,
+    excludeWorkingDirs: typeof f.excludeWorkingDirs === 'string' ? f.excludeWorkingDirs : undefined,
     json: f.json === true,
     quiet: f.quiet === true,
     autoApprove: f.autoApprove === true,

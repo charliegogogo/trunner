@@ -17,6 +17,7 @@ import { ExecutionView } from './ui/ExecutionView.js';
 import { StreamView } from './ui/StreamView.js';
 import { InteractiveWizard, type InteractiveWizardResult } from './ui/InteractiveWizard.js';
 import { ManagementView } from './ui/ManagementView.js';
+import { parseExcludeWorkingDirs, filterExcludedWorkingDirs } from './utils/exclude-dirs.js';
 import type { CliFlags } from './types.js';
 
 export interface AppProps {
@@ -147,7 +148,14 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
     let cancelled = false;
     (async () => {
       try {
-        const ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        let ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+
+        // Filter out excluded working directories
+        const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
+        if (excludedPaths.length > 0) {
+          ws = filterExcludedWorkingDirs(ws, flags.cwd, excludedPaths);
+        }
+
         if (cancelled) return;
         if (ws.length === 0) {
           const cwdAbs = resolvePath(flags.cwd);
@@ -163,9 +171,11 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
               parseError = (err as Error).message;
             }
           }
-          const msg = parseError
-            ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
-            : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
+          const msg = excludedPaths.length > 0
+            ? `all discovered working directories were excluded by --exclude-working-dirs`
+            : parseError
+              ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
+              : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
           setState({
             phase: 'error',
             workingDirs: [],
@@ -195,7 +205,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
     return () => {
       cancelled = true;
     };
-  }, [command, commandArgs, flags.cwd, flags.exclude, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+  }, [command, commandArgs, flags.cwd, flags.exclude, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
 
   useInput(
     (_input, key) => {
@@ -293,6 +303,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   const [interactiveCategory, setInteractiveCategory] = useState<'run' | 'manage' | null>(null);
   const [managementTarget, setManagementTarget] = useState<'tools' | 'providers' | null>(null);
   const [detectedTool, setDetectedTool] = useState<'terraform' | 'opentofu' | 'mixed' | null>(null);
+  const [discoveredWorkingDirs, setDiscoveredWorkingDirs] = useState<WorkingDir[]>([]);
 
   useEffect(() => {
     if (!interactiveMode) return;
@@ -312,6 +323,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       // Scan all subdirectories to detect mixed tools
       try {
         const workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        setDiscoveredWorkingDirs(workingDirs);
         const tools = new Set(workingDirs.map((ws) => ws.config.tool));
         if (tools.size > 1) {
           setDetectedTool('mixed');
@@ -368,6 +380,8 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
       <InteractiveWizard
         defaultRc={defaultRc}
         detectedTool={detectedTool}
+        workingDirs={discoveredWorkingDirs}
+        cwd={flags.cwd}
         onComplete={(result: InteractiveWizardResult) => {
           setSelectedTool(result.tool);
           setInteractiveCategory(result.category);
@@ -375,6 +389,10 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
             setSelectedCommand(result.command);
           } else if (result.category === 'manage' && result.managementTarget) {
             setManagementTarget(result.managementTarget);
+          }
+          // Store excluded working dirs in flags for later use
+          if (result.excludedWorkingDirs && result.excludedWorkingDirs.length > 0) {
+            flags.excludeWorkingDirs = result.excludedWorkingDirs.join(',');
           }
         }}
       />
@@ -405,7 +423,14 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     let cancelled = false;
     (async () => {
       try {
-        const ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        let ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+
+        // Filter out excluded working directories
+        const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
+        if (excludedPaths.length > 0) {
+          ws = filterExcludedWorkingDirs(ws, flags.cwd, excludedPaths);
+        }
+
         if (cancelled) return;
         if (ws.length === 0) {
           const cwdAbs = resolvePath(flags.cwd);
@@ -421,9 +446,11 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
               parseError = (err as Error).message;
             }
           }
-          const msg = parseError
-            ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
-            : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
+          const msg = excludedPaths.length > 0
+            ? `all discovered working directories were excluded by --exclude-working-dirs`
+            : parseError
+              ? `${parseError}\n  (fix ${cwdRc} or pass --cwd <path> to a different directory)`
+              : `no .trunnerrc found under ${flags.cwd}; cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <tool>`;
           setState({
             phase: 'error',
             workingDirs: [],
@@ -453,7 +480,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     return () => {
       cancelled = true;
     };
-  }, [command, commandArgs, flags.cwd, flags.exclude, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+  }, [command, commandArgs, flags.cwd, flags.exclude, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
 
   useInput(
     (_input, key) => {

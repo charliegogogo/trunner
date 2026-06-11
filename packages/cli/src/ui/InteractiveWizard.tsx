@@ -1,19 +1,23 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { TrunnerRc } from '@trunner/sdk';
+import type { TrunnerRc, WorkingDir } from '@trunner/sdk';
 import { Banner } from './Banner.js';
+import { getRelativePath } from '../utils/exclude-dirs.js';
 
 export interface InteractiveWizardResult {
   command: string;
   tool: string;
   category: 'run' | 'manage';
   managementTarget?: 'tools' | 'providers';
+  excludedWorkingDirs?: string[];
 }
 
 export interface InteractiveWizardProps {
   onComplete: (result: InteractiveWizardResult) => void;
   defaultRc: TrunnerRc | null;
   detectedTool: 'terraform' | 'opentofu' | 'mixed' | null;
+  workingDirs?: WorkingDir[];
+  cwd?: string;
 }
 
 const RUN_COMMANDS = ['plan', 'apply', 'destroy'] as const;
@@ -29,9 +33,9 @@ const ALL_OPTIONS = [
   })),
 ];
 
-type Step = 'tool' | 'command';
+type Step = 'tool' | 'command' | 'exclude';
 
-export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: InteractiveWizardProps): React.ReactElement {
+export function InteractiveWizard({ onComplete, defaultRc, detectedTool, workingDirs = [], cwd = process.cwd() }: InteractiveWizardProps): React.ReactElement {
   const [step, setStep] = useState<Step>('tool');
   const [selectedTool, setSelectedTool] = useState<string>('terraform');
   const [selectedIndex, setSelectedIndex] = useState<number>(
@@ -40,6 +44,8 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: Inter
       : 0
   );
   const [toolIndex, setToolIndex] = useState<number>(0);
+  const [excludeIndices, setExcludeIndices] = useState<Set<number>>(new Set());
+  const [excludeFocusIndex, setExcludeFocusIndex] = useState<number>(0);
 
   const selectedOption = ALL_OPTIONS[selectedIndex]!;
 
@@ -72,15 +78,39 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: Inter
     (input: string, key: { return: boolean; upArrow: boolean; downArrow: boolean }) => {
       const tools = getToolOptions(detectedTool);
 
+      // Handle space key for toggling exclude selection
+      const isSpace = input === ' ';
+
       if (key.return) {
         if (step === 'tool') {
           setStep('command');
         } else if (step === 'command') {
-          // User confirmed command selection
+          // If there are working dirs, go to exclude step; otherwise complete
+          if (workingDirs.length > 0) {
+            setStep('exclude');
+          } else {
+            const result: InteractiveWizardResult = {
+              command: selectedOption.command,
+              tool: selectedTool,
+              category: selectedOption.category,
+            };
+            if ('managementTarget' in selectedOption) {
+              result.managementTarget = selectedOption.managementTarget;
+            }
+            onComplete(result);
+          }
+        } else if (step === 'exclude') {
+          // Complete with excluded working dirs
+          const excludedPaths = Array.from(excludeIndices).map((idx) => {
+            const wd = workingDirs[idx];
+            return wd ? getRelativePath(wd.dir, cwd) : '';
+          }).filter((p) => p.length > 0);
+
           const result: InteractiveWizardResult = {
             command: selectedOption.command,
             tool: selectedTool,
             category: selectedOption.category,
+            excludedWorkingDirs: excludedPaths.length > 0 ? excludedPaths : undefined,
           };
           if ('managementTarget' in selectedOption) {
             result.managementTarget = selectedOption.managementTarget;
@@ -106,9 +136,26 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: Inter
         } else if (key.downArrow) {
           setSelectedIndex((prev) => Math.min(ALL_OPTIONS.length - 1, prev + 1));
         }
+      } else if (step === 'exclude') {
+        if (key.upArrow) {
+          setExcludeFocusIndex((prev) => Math.max(0, prev - 1));
+        } else if (key.downArrow) {
+          setExcludeFocusIndex((prev) => Math.min(workingDirs.length - 1, prev + 1));
+        } else if (isSpace) {
+          // Toggle selection
+          setExcludeIndices((prev) => {
+            const next = new Set(prev);
+            if (next.has(excludeFocusIndex)) {
+              next.delete(excludeFocusIndex);
+            } else {
+              next.add(excludeFocusIndex);
+            }
+            return next;
+          });
+        }
       }
     },
-    [step, toolIndex, selectedOption, selectedTool, onComplete, detectedTool],
+    [step, toolIndex, selectedOption, selectedTool, onComplete, detectedTool, workingDirs, excludeFocusIndex, excludeIndices, cwd],
   );
 
   useInput(handleInput, { isActive: true });
@@ -179,6 +226,41 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool }: Inter
 
           <Box marginTop={1}>
             <Text dimColor>Press <Text bold>Enter</Text> to select, <Text bold>↑/↓</Text> to navigate</Text>
+          </Box>
+        </Box>
+      )}
+
+      {step === 'exclude' && (
+        <Box flexDirection="column">
+          <Text bold>Select working directories to <Text color="red">exclude</Text>:</Text>
+          <Box marginTop={1}>
+            <Text dimColor>Press <Text bold>Space</Text> to toggle, <Text bold>Enter</Text> to confirm, <Text bold>↑/↓</Text> to navigate</Text>
+          </Box>
+          <Box marginTop={1} flexDirection="column">
+            {workingDirs.map((wd, i) => {
+              const isActive = i === excludeFocusIndex;
+              const isSelected = excludeIndices.has(i);
+              const relPath = getRelativePath(wd.dir, cwd);
+              return (
+                <Text key={wd.dir}>
+                  {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
+                  <Text color={isSelected ? 'green' : undefined}>
+                    {isSelected ? '[✓]' : '[ ]'}
+                  </Text>
+                  <Text> {relPath}</Text>
+                  {isActive && (
+                    <Text dimColor> ({wd.config.tool})</Text>
+                  )}
+                </Text>
+              );
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>
+              {excludeIndices.size === 0
+                ? 'No directories excluded — all will run'
+                : `${excludeIndices.size} director${excludeIndices.size === 1 ? 'y' : 'ies'} excluded`}
+            </Text>
           </Box>
         </Box>
       )}
