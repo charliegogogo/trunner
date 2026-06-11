@@ -81,10 +81,8 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
         if (step === 'tool') {
           setStep('command');
         } else if (step === 'command') {
-          // If there are working dirs, go to exclude step; otherwise complete
-          if (workingDirs.length > 0) {
-            setStep('exclude');
-          } else {
+          // Management is global — no exclude step needed
+          if (selectedOption.category === 'manage') {
             const result: InteractiveWizardResult = {
               command: selectedOption.command,
               tool: selectedTool,
@@ -93,6 +91,15 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
             if ('managementTarget' in selectedOption) {
               result.managementTarget = selectedOption.managementTarget;
             }
+            onComplete(result);
+          } else if (workingDirs.length > 0) {
+            setStep('exclude');
+          } else {
+            const result: InteractiveWizardResult = {
+              command: selectedOption.command,
+              tool: selectedTool,
+              category: selectedOption.category,
+            };
             onComplete(result);
           }
         } else if (step === 'exclude') {
@@ -108,9 +115,6 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
             category: selectedOption.category,
             excludedWorkingDirs: excludedPaths.length > 0 ? excludedPaths : undefined,
           };
-          if ('managementTarget' in selectedOption) {
-            result.managementTarget = selectedOption.managementTarget;
-          }
           onComplete(result);
         }
         return;

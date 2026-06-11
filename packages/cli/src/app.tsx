@@ -16,7 +16,8 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ExecutionView } from './ui/ExecutionView.js';
 import { StreamView } from './ui/StreamView.js';
 import { InteractiveWizard, type InteractiveWizardResult } from './ui/InteractiveWizard.js';
-import { ManagementView } from './ui/ManagementView.js';
+import { BinaryManagementView } from './ui/BinaryManagementView.js';
+import { ProviderManagementView } from './ui/ProviderManagementView.js';
 import { parseExcludeWorkingDirs, filterExcludedWorkingDirs } from './utils/exclude-dirs.js';
 import type { CliFlags } from './types.js';
 
@@ -344,10 +345,23 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
   if (interactiveMode) {
     // Show ManagementView if in manage category (not for "mixed")
     if (interactiveCategory === 'manage' && managementTarget && selectedTool && selectedTool !== 'mixed') {
+      if (managementTarget === 'tools') {
+        return (
+          <BinaryManagementView
+            tool={selectedTool as 'terraform' | 'opentofu'}
+            width={termWidth}
+            height={termHeight}
+            onExit={() => {
+              setInteractiveCategory(null);
+              setManagementTarget(null);
+              setSelectedCommand(null);
+            }}
+          />
+        );
+      }
       return (
-        <ManagementView
-          tool={selectedTool}
-          target={managementTarget}
+        <ProviderManagementView
+          tool={selectedTool as 'terraform' | 'opentofu'}
           width={termWidth}
           height={termHeight}
           onExit={() => {

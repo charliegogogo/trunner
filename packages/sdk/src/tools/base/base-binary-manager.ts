@@ -200,6 +200,16 @@ export abstract class BaseBinaryManager {
     return versions;
   }
 
+  /** List ALL available versions from the release source, merged with install status. */
+  async listAvailable(opts?: { signal?: AbortSignal }): Promise<Array<{ version: string; installed: boolean }>> {
+    const [allVersions, installedVersions] = await Promise.all([
+      this.releaseSource.listVersions({ signal: opts?.signal }),
+      this.listInstalled(),
+    ]);
+    const installedSet = new Set(installedVersions);
+    return allVersions.map((v) => ({ version: v, installed: installedSet.has(v) }));
+  }
+
   // For subclass overrides (e.g. provider mirroring).
   protected useMirror(url: string): string {
     return url;

@@ -11,6 +11,8 @@ import type { ResolvedProvider } from '../../types/provider.js';
 export interface ProviderSource {
   /** Resolve a single provider version into a downloadable artifact URL. */
   resolve(opts: { source: string; version: string; platform: PlatformInfo; arch: string }): Promise<ResolvedProvider>;
+  /** List all available versions for a provider source on the current platform. */
+  listVersions?(opts: { source: string; platform: PlatformInfo; signal?: AbortSignal }): Promise<Array<{ version: string; protocols?: string[] }>>;
 }
 
 export interface ProviderManagerOptions {
@@ -121,6 +123,24 @@ export abstract class BaseProviderManager {
       }
     }
     return out;
+  }
+
+  /** List all available versions for a provider from the registry, cross-referenced with installed status. */
+  async listAvailable(opts: { source: string; signal?: AbortSignal }): Promise<Array<{ version: string; installed: boolean }>> {
+    if (!this.source.listVersions) return [];
+    const allVersions = await this.source.listVersions({
+      source: opts.source,
+      platform: this.platform,
+      signal: opts.signal,
+    });
+    const installed = await this.listInstalled();
+    const installedSet = new Set(
+      installed.filter((p) => p.source === opts.source).map((p) => p.version),
+    );
+    return allVersions.map((v) => ({
+      version: v.version,
+      installed: installedSet.has(v.version),
+    }));
   }
 }
 

@@ -32,15 +32,25 @@ export class OpenTofuReleaseSource implements ReleaseSource {
 
   async resolve(opts: { version: string; platform: PlatformInfo; signal?: AbortSignal }): Promise<ReleaseEntry> {
     const { version, platform, signal } = opts;
-    // Try to find release by tag
     const tag = `v${version}`;
-    const url = `${this.baseUrl}/download/${tag}/tofu_${version}_${platform.os}_${platform.arch}.zip`;
-    const filename = `tofu_${version}_${platform.os}_${platform.arch}.zip`;
+
+    // Fetch specific release info via tags API
+    const releaseUrl = `https://api.github.com/repos/opentofu/opentofu/releases/tags/${tag}`;
+    const buf = await fetchBuffer({ url: releaseUrl, signal });
+    const release = JSON.parse(buf.toString('utf-8')) as GitHubReleaseDetail;
+
+    // Find the asset for current platform
+    const assetName = `tofu_${version}_${platform.os}_${platform.arch}.zip`;
+    const asset = release.assets?.find((a) => a.name === assetName);
+
+    if (!asset) {
+      throw new Error(`No OpenTofu ${version} build for ${platform.os}/${platform.arch}`);
+    }
 
     return {
       version,
-      url,
-      filename,
+      url: asset.browser_download_url,
+      filename: assetName,
       archiveFormat: 'zip',
     };
   }
@@ -49,6 +59,14 @@ export class OpenTofuReleaseSource implements ReleaseSource {
 interface GitHubRelease {
   tag_name: string;
   prerelease: boolean;
+}
+
+interface GitHubReleaseDetail {
+  tag_name: string;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+  }>;
 }
 
 function compareSemverDesc(a: string, b: string): number {
