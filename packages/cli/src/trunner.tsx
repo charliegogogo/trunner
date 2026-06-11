@@ -26,7 +26,6 @@ const cli = meow(
        --include-prerelease      Allow pre-release versions in the solver (Phase 2B)
        --mirror <url>            Override the default terraform + provider mirror (Phase 2B)
        --concurrency <n>         Max working directories running in parallel (default: os.cpus().length)
-       --exclude <dir>           Add <dir> to the scan's exclude set (repeatable)
        --exclude-working-dirs <dirs>  Comma-separated relative paths of working dirs to exclude (e.g. "dir1,dir2/subdir")
        --no-alt-screen           Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals)
        --json                    Emit one JSON line per working directory event (CI-friendly; no TUI)
@@ -42,7 +41,6 @@ const cli = meow(
       $ trunner apply -auto-approve
       $ trunner plan -t opentofu
       $ trunner plan --concurrency 1
-      $ trunner plan --exclude vendor
       $ trunner plan --exclude-working-dirs "terraform_data_test,nested/terraform_data_test_nested"
   `,
   {
@@ -57,7 +55,6 @@ const cli = meow(
       includePrerelease: { type: 'boolean', default: false },
       mirror: { type: 'string' },
       concurrency: { type: 'string' },
-      exclude: { type: 'string', isMultiple: true, default: [] },
       excludeWorkingDirs: { type: 'string' },
       json: { type: 'boolean', default: false },
       quiet: { type: 'boolean', default: false },
@@ -157,7 +154,7 @@ async function main(): Promise<void> {
  * Ideal for CI/CD pipelines and AI agent consumption.
  */
 async function runJsonMode(command: string, args: string[], flags: CliFlags): Promise<void> {
-  let workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+  let workingDirs = await discoverWorkingDirs(flags.cwd);
 
   // Filter out excluded working directories
   const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
@@ -252,7 +249,6 @@ function parseFlags(cli: { flags: Record<string, unknown> }): CliFlags {
     typeof concurrencyRaw === 'string' && /^\d+$/.test(concurrencyRaw)
       ? Number.parseInt(concurrencyRaw, 10)
       : undefined;
-  const exclude = Array.isArray(f.exclude) ? (f.exclude as string[]) : [];
   return {
     tool: typeof f.tool === 'string' ? f.tool : undefined,
     cwd: typeof f.cwd === 'string' ? f.cwd : process.cwd(),
@@ -260,7 +256,6 @@ function parseFlags(cli: { flags: Record<string, unknown> }): CliFlags {
     includePrerelease: f.includePrerelease === true,
     mirror: typeof f.mirror === 'string' ? f.mirror : undefined,
     concurrency,
-    exclude,
     excludeWorkingDirs: typeof f.excludeWorkingDirs === 'string' ? f.excludeWorkingDirs : undefined,
     json: f.json === true,
     quiet: f.quiet === true,

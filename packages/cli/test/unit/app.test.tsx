@@ -9,7 +9,6 @@ import type { CliFlags } from '../../src/types.js';
 
 const baseFlags: CliFlags = {
   cwd: process.cwd(),
-  exclude: [],
   includePrerelease: false,
   json: false,
   quiet: false,

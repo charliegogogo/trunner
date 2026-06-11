@@ -148,7 +148,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
     let cancelled = false;
     (async () => {
       try {
-        let ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        let ws = await discoverWorkingDirs(flags.cwd, );
 
         // Filter out excluded working directories
         const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
@@ -205,7 +205,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
     return () => {
       cancelled = true;
     };
-  }, [command, commandArgs, flags.cwd, flags.exclude, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+  }, [command, commandArgs, flags.cwd, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
 
   useInput(
     (_input, key) => {
@@ -322,7 +322,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
 
       // Scan all subdirectories to detect mixed tools
       try {
-        const workingDirs = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        const workingDirs = await discoverWorkingDirs(flags.cwd, );
         setDiscoveredWorkingDirs(workingDirs);
         const tools = new Set(workingDirs.map((ws) => ws.config.tool));
         if (tools.size > 1) {
@@ -337,7 +337,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
         setDetectedTool('terraform');
       }
     })();
-  }, [interactiveMode, flags.cwd, flags.exclude]);
+  }, [interactiveMode, flags.cwd]);
 
   const { width: termWidth, height: termHeight } = useTerminalSize();
 
@@ -423,7 +423,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     let cancelled = false;
     (async () => {
       try {
-        let ws = await discoverWorkingDirs(flags.cwd, { exclude: flags.exclude });
+        let ws = await discoverWorkingDirs(flags.cwd, );
 
         // Filter out excluded working directories
         const excludedPaths = parseExcludeWorkingDirs(flags.excludeWorkingDirs);
@@ -480,7 +480,7 @@ export function App({ command, commandArgs, flags, interactiveMode, onExit }: Ap
     return () => {
       cancelled = true;
     };
-  }, [command, commandArgs, flags.cwd, flags.exclude, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
+  }, [command, commandArgs, flags.cwd, flags.excludeWorkingDirs, flags.concurrency, flags.toolVersion, flags.tool, flags.autoApprove]);
 
   useInput(
     (_input, key) => {

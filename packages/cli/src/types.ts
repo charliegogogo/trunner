@@ -7,7 +7,6 @@ export interface CliFlags {
   includePrerelease: boolean;
   mirror?: string;
   concurrency?: number;
-  exclude: string[];
   excludeWorkingDirs?: string;
   json: boolean;
   quiet: boolean;
