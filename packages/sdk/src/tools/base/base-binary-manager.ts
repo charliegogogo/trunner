@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { chmod, readdir } from 'node:fs/promises';
 import type { ToolId, VersionInfo } from '../../types/tool.js';
+import type { ProgressInfo } from '../../types/events.js';
 import type { Logger } from '../../utils/logger.js';
 import { ConsoleLogger, NoopLogger } from '../../utils/logger.js';
 import { getPlatformInfo, type PlatformInfo } from '../../utils/os.js';
@@ -84,7 +85,12 @@ export abstract class BaseBinaryManager {
    * Ensure a binary for `version` is present in the local cache. Downloads
    * (and verifies, if a checksum is provided) and extracts as needed.
    */
-  async ensureInstalled(opts: { version: string; signal?: AbortSignal; force?: boolean }): Promise<string> {
+  async ensureInstalled(opts: {
+    version: string;
+    signal?: AbortSignal;
+    force?: boolean;
+    onProgress?: (info: ProgressInfo) => void;
+  }): Promise<string> {
     const { version } = opts;
     const target = this.binaryPath(version);
     if (!opts.force && (await exists(target))) {
@@ -115,6 +121,7 @@ export abstract class BaseBinaryManager {
         dest: archivePath,
         logger: this.logger,
         signal: opts.signal,
+        onProgress: opts.onProgress,
       });
     } else {
       this.logger.debug('archive already cached', { archivePath });

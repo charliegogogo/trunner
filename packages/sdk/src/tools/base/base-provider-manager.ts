@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { ToolId } from '../../types/tool.js';
+import type { ProgressInfo } from '../../types/events.js';
 import type { Logger } from '../../utils/logger.js';
 import { NoopLogger } from '../../utils/logger.js';
 import { getPlatformInfo, type PlatformInfo } from '../../utils/os.js';
@@ -56,7 +57,12 @@ export abstract class BaseProviderManager {
     return join(this.providersDir, 'filesystem_mirror', 'registry.terraform.io');
   }
 
-  async install(opts: { source: string; version: string; signal?: AbortSignal }): Promise<string> {
+  async install(opts: {
+    source: string;
+    version: string;
+    signal?: AbortSignal;
+    onProgress?: (info: ProgressInfo) => void;
+  }): Promise<string> {
     const resolved = await this.source.resolve({
       source: opts.source,
       version: opts.version,
@@ -79,6 +85,7 @@ export abstract class BaseProviderManager {
       dest: tmpArchive,
       logger: this.logger,
       signal: opts.signal,
+      onProgress: opts.onProgress,
     });
 
     const { extractArchive } = await import('../../installer/extractor.js');

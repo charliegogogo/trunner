@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { BaseProviderManager, TerraformProviderManager, OpenTofuProviderManager, getPlatformInfo } from '@trunner/sdk';
+import { BaseProviderManager, TerraformProviderManager, OpenTofuProviderManager, getPlatformInfo, type ProgressInfo } from '@trunner/sdk';
 import { Modal } from './Modal.js';
+import { DownloadProgress } from './DownloadProgress.js';
 
 export interface ProviderManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -22,6 +23,7 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
   const [inputSource, setInputSource] = useState('');
   const [availableVersions, setAvailableVersions] = useState<Array<{ version: string; installed: boolean }>>([]);
   const [versionSelectedIndex, setVersionSelectedIndex] = useState(0);
+  const [downloadProgress, setDownloadProgress] = useState<ProgressInfo | null>(null);
 
   const manager: BaseProviderManager = useMemo(
     () => tool === 'terraform' ? new TerraformProviderManager() : new OpenTofuProviderManager(),
@@ -66,13 +68,20 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
 
   const handleInstall = async (source: string, version: string) => {
     setPhase('installing');
-    setStatusMessage(`Installing ${source} ${version}...`);
+    setStatusMessage(null);
+    setDownloadProgress(null);
     try {
-      await manager.install({ source, version });
+      await manager.install({
+        source,
+        version,
+        onProgress: (info: ProgressInfo) => setDownloadProgress(info),
+      });
+      setDownloadProgress(null);
       setStatusMessage(`Installed ${source} ${version}`);
       setInputSource('');
       await loadInstalled();
     } catch (err) {
+      setDownloadProgress(null);
       setStatusMessage(`Error installing: ${(err as Error).message}`);
       setPhase('versions');
     }
@@ -320,8 +329,17 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
 
         {/* Installing / Uninstalling overlay */}
         {(phase === 'installing' || phase === 'uninstalling') && (
-          <Box marginTop={1}>
-            <Text color="yellow">{phase === 'installing' ? 'Installing...' : 'Uninstalling...'}</Text>
+          <Box marginTop={1} flexDirection="column">
+            {phase === 'installing' ? (
+              <DownloadProgress
+                current={downloadProgress?.current ?? 0}
+                total={downloadProgress?.total ?? 0}
+                label={`Downloading provider...`}
+                width={width - 2}
+              />
+            ) : (
+              <Text color="yellow">Uninstalling...</Text>
+            )}
           </Box>
         )}
       </Box>

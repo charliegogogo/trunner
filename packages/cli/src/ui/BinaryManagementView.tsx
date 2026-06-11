@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { BaseBinaryManager, TerraformBinaryManager, OpenTofuBinaryManager } from '@trunner/sdk';
+import { BaseBinaryManager, TerraformBinaryManager, OpenTofuBinaryManager, type ProgressInfo } from '@trunner/sdk';
 import { Modal } from './Modal.js';
+import { DownloadProgress } from './DownloadProgress.js';
 
 export interface BinaryManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -17,6 +18,7 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
   const [versions, setVersions] = useState<Array<{ version: string; installed: boolean }>>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<ProgressInfo | null>(null);
 
   const manager: BaseBinaryManager = useMemo(
     () => tool === 'terraform' ? new TerraformBinaryManager() : new OpenTofuBinaryManager(),
@@ -43,12 +45,19 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
 
   const handleInstall = async (version: string) => {
     setPhase('installing');
-    setStatusMessage(`Installing ${tool} ${version}...`);
+    setStatusMessage(null);
+    setDownloadProgress(null);
     try {
-      await manager.ensureInstalled({ version, force: true });
+      await manager.ensureInstalled({
+        version,
+        force: true,
+        onProgress: (info: ProgressInfo) => setDownloadProgress(info),
+      });
+      setDownloadProgress(null);
       setStatusMessage(`Installed ${tool} ${version}`);
       await loadVersions();
     } catch (err) {
+      setDownloadProgress(null);
       setStatusMessage(`Error installing: ${(err as Error).message}`);
       setPhase('list');
     }
@@ -193,8 +202,17 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
 
         {/* Installing / Uninstalling overlay */}
         {(phase === 'installing' || phase === 'uninstalling') && (
-          <Box marginTop={1}>
-            <Text color="yellow">{phase === 'installing' ? 'Installing...' : 'Uninstalling...'}</Text>
+          <Box marginTop={1} flexDirection="column">
+            {phase === 'installing' ? (
+              <DownloadProgress
+                current={downloadProgress?.current ?? 0}
+                total={downloadProgress?.total ?? 0}
+                label={`Downloading ${tool}...`}
+                width={width - 2}
+              />
+            ) : (
+              <Text color="yellow">Uninstalling...</Text>
+            )}
           </Box>
         )}
       </Box>
