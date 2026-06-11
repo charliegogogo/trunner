@@ -12,12 +12,6 @@ export interface TrunnerRc {
   readonly tool: ToolId;
   /** Optional tool binary version constraint (e.g. "~> 1.6"). */
   readonly version?: string;
-  /** Optional per-working-directory concurrency override. */
-  readonly concurrency?: number;
-  /** Optional extra dirs to skip during the recursive scan. */
-  readonly exclude?: readonly string[];
-  /** Optional default command for interactive mode (e.g. "plan", "apply"). */
-  readonly command?: string;
 }
 
 export interface ParseRcWarning {
@@ -30,7 +24,7 @@ export interface ParseRcResult {
   warnings: ParseRcWarning[];
 }
 
-const KNOWN_KEYS: ReadonlySet<string> = new Set(['tool', 'version', 'concurrency', 'exclude', 'command']);
+const KNOWN_KEYS: ReadonlySet<string> = new Set(['tool', 'version']);
 
 const TOOL_ALIASES: Record<string, ToolId> = {
   terraform: 'terraform',
@@ -96,43 +90,10 @@ export async function parseRc(path: string): Promise<ParseRcResult> {
     version = parsed.version;
   }
 
-  let concurrency: number | undefined;
-  if (parsed.concurrency !== undefined) {
-    if (typeof parsed.concurrency !== 'number' || !Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
-      throw new RcParseError(
-        `invalid value for 'concurrency': expected positive integer, got ${JSON.stringify(parsed.concurrency)}`,
-        path,
-      );
-    }
-    concurrency = parsed.concurrency;
-  }
-
-  let exclude: readonly string[] | undefined;
-  if (parsed.exclude !== undefined) {
-    if (!Array.isArray(parsed.exclude) || !parsed.exclude.every((e) => typeof e === 'string' && e.length > 0)) {
-      throw new RcParseError(
-        `invalid value for 'exclude': expected array of non-empty strings`,
-        path,
-      );
-    }
-    exclude = parsed.exclude as string[];
-  }
-
-  let command: string | undefined;
-  if (parsed.command !== undefined) {
-    if (typeof parsed.command !== 'string' || parsed.command.length === 0) {
-      throw new RcParseError(`invalid value for 'command': expected non-empty string, got ${typeof parsed.command}`, path);
-    }
-    command = parsed.command;
-  }
-
   const config: TrunnerRc = {
     path,
     tool: toolResolved,
     ...(version !== undefined ? { version } : {}),
-    ...(concurrency !== undefined ? { concurrency } : {}),
-    ...(exclude !== undefined ? { exclude } : {}),
-    ...(command !== undefined ? { command } : {}),
   };
 
   return { config, warnings };

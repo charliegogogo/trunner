@@ -31,8 +31,6 @@ describe('working-dir/trunner-rc', () => {
     expect(config.path).toBe(path);
     expect(warnings).toEqual([]);
     expect(config.version).toBeUndefined();
-    expect(config.concurrency).toBeUndefined();
-    expect(config.exclude).toBeUndefined();
   });
 
   it('parses all optional fields', async () => {
@@ -41,17 +39,11 @@ describe('working-dir/trunner-rc', () => {
       [
         'tool = "opentofu"',
         'version = "~> 1.6"',
-        'concurrency = 4',
-        'exclude = ["vendor", "build"]',
-        'command = "apply"',
       ].join('\n'),
     );
     const { config, warnings } = await parseRc(path);
     expect(config.tool).toBe('opentofu');
     expect(config.version).toBe('~> 1.6');
-    expect(config.concurrency).toBe(4);
-    expect(config.exclude).toEqual(['vendor', 'build']);
-    expect(config.command).toBe('apply');
     expect(warnings).toEqual([]);
   });
 
@@ -88,26 +80,6 @@ describe('working-dir/trunner-rc', () => {
     const path = await writeRc('g', 'tool = "terraform\n'); // unterminated string
     await expect(parseRc(path)).rejects.toBeInstanceOf(RcParseError);
     await expect(parseRc(path)).rejects.toThrow(/TOML parse error/);
-  });
-
-  it('throws RcParseError for non-positive concurrency', async () => {
-    const path = await writeRc('h', ['tool = "terraform"', 'concurrency = -1'].join('\n'));
-    await expect(parseRc(path)).rejects.toThrow(/invalid value for 'concurrency'/);
-  });
-
-  it('throws RcParseError for non-integer concurrency', async () => {
-    const path = await writeRc('i', ['tool = "terraform"', 'concurrency = 1.5'].join('\n'));
-    await expect(parseRc(path)).rejects.toThrow(/invalid value for 'concurrency'/);
-  });
-
-  it('throws RcParseError for non-array exclude', async () => {
-    const path = await writeRc('j', ['tool = "terraform"', 'exclude = "vendor"'].join('\n'));
-    await expect(parseRc(path)).rejects.toThrow(/invalid value for 'exclude'/);
-  });
-
-  it('throws RcParseError for empty-string entries in exclude', async () => {
-    const path = await writeRc('k', ['tool = "terraform"', 'exclude = ["vendor", ""]'].join('\n'));
-    await expect(parseRc(path)).rejects.toThrow(/invalid value for 'exclude'/);
   });
 
   it('errors when the rc file is missing', async () => {

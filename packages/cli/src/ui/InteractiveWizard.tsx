@@ -38,11 +38,7 @@ type Step = 'tool' | 'command' | 'exclude';
 export function InteractiveWizard({ onComplete, defaultRc, detectedTool, workingDirs = [], cwd = process.cwd() }: InteractiveWizardProps): React.ReactElement {
   const [step, setStep] = useState<Step>('tool');
   const [selectedTool, setSelectedTool] = useState<string>('terraform');
-  const [selectedIndex, setSelectedIndex] = useState<number>(
-    defaultRc?.command
-      ? Math.max(0, ALL_OPTIONS.findIndex((o) => o.command === defaultRc.command))
-      : 0
-  );
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [toolIndex, setToolIndex] = useState<number>(0);
   const [excludeIndices, setExcludeIndices] = useState<Set<number>>(new Set());
   const [excludeFocusIndex, setExcludeFocusIndex] = useState<number>(0);
@@ -202,9 +198,6 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
               <Text key={cmd}>
                 {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
                 {isActive ? <Text bold>{cmd}</Text> : <Text dimColor>{cmd}</Text>}
-                {isActive && cmd === defaultRc?.command && (
-                  <Text dimColor> (default from .trunnerrc)</Text>
-                )}
               </Text>
             );
           })}

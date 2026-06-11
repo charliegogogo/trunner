@@ -6,9 +6,9 @@ Repo-specific guidance for AI agents working in `trunner`. Skim this before touc
 
 pnpm + TypeScript monorepo. POC scope is **Terraform only** — OpenTofu is a placeholder for a later phase; **Terragrunt is explicitly cut from POC scope** (see PLAN.md §1). The `master plan` is in [`PLAN.md`](./PLAN.md); the full phase breakdown (Phases 1 → 3B) is in §7 of that file.
 
-**Status**: Phase 1 ✅, Phase 2A ✅ (CLI TUI shell + Node SEA pipeline), Phase 2A.5 + 2B in design (single-verb surface + `.trunnerrc` + multi-workspace parallel execution + smart version selection in the SDK). `@trunner/sdk` 53/53 unit + 1/1 integration; `@trunner/cli` 14/14. `packages/desktop` is not created yet.
+**Status**: Phase 1 ✅, Phase 2A ✅ (CLI TUI shell + Node SEA pipeline), Phase 2A.5 ✅ (single-verb surface + `.trunnerrc` + multi-working-directory parallel execution + smart version selection in the SDK). `@trunner/sdk` 91/91 unit + 1/1 integration; `@trunner/cli` 32/32. `packages/desktop` is not created yet.
 
-**CLI shape**: single-verb, tool-as-config — `trunner plan`, not `trunner terraform plan`. Tool is set by `.trunnerrc` (per-workspace TOML) or `-t` on the command line. `trunner <command>` discovers all `.trunnerrc` workspaces under cwd and runs the command against each in parallel, with a Claude-Code-style carousel view. See PLAN.md §4.8 / §4.9 / §5.1 and gotchas 16–19.
+**CLI shape**: single-verb, tool-as-config — `trunner plan`, not `trunner terraform plan`. Tool is set by `.trunnerrc` (per-working-directory TOML) or `-t` on the command line. `trunner <command>` discovers all `.trunnerrc` working directories under cwd and runs the command against each in parallel, with a Claude-Code-style carousel view. See PLAN.md §4.8 / §4.9 / §5.1 and gotchas 16–19.
 
 ## Layout
 
@@ -27,20 +27,18 @@ trunner/
     │   │   ├── types/           # Tool, CommandSpec, RunnerEventMap, ResolvedManifest, …
     │   │   ├── utils/           # logger, fs, os
     │   │   ├── env/             # ~/.trunner paths + persistent TrunnerConfig
-    │   │   ├── installer/       # checksum, downloader, extractor (tar+adm-zip),
-    │   │   │                    # version-solver, constraint-set, hcl-walker,
-    │   │   │                    # provider-registry (Phase 2B)
-    │   │   ├── workspace/       # Phase 2A.5: trunner-rc (TOML schema), discover,
+    │   │   ├── installer/       # checksum, downloader, extractor (tar+adm-zip)
+    │   │   ├── working-dir/     # Phase 2A.5: trunner-rc (TOML schema), discover,
     │   │   │                    # runner (parallel + stream multiplexing)
     │   │   ├── tools/
     │   │   │   ├── base/        # BaseTool (with resolveAll), BaseBinaryManager
     │   │   │   │                # (with resolveVersion/listInstalled), BaseProviderManager
     │   │   │   ├── terraform/   # concrete impl (release-source, binary, provider, commands)
-    │   │   │   └── opentofu/    # placeholder
+    │   │   │   └── opentofu/    # concrete impl (mirrors terraform/)
     │   │   ├── runner/          # RunnerStream (EventEmitter), executor, parser
     │   │   └── registry/        # ToolRegistry
     │   ├── test/
-    │   │   ├── unit/            # 12 files, 53 tests (will grow to ~67 with 2A.5 + 2B)
+    │   │   ├── unit/            # 17 files, 91 tests
     │   │   └── integration/     # full init/plan/apply/destroy cycle (Phase 1)
     │   │                        # + smart-resolve.test.ts (Phase 2B)
     │   ├── tsup.config.ts       # ESM + CJS + dts, target node26
@@ -49,19 +47,21 @@ trunner/
     └── cli/                     # Phase 2A done; 2A.5 rewrites the surface
         ├── src/
         │   ├── trunner.tsx      # entry (single-verb parsing, global flags)
-        │   ├── app.tsx          # discover + runWorkspaces + ExecutionView
+        │   ├── app.tsx          # discover + runWorkingDirs + ExecutionView
         │   ├── ui/              # ExecutionView, InteractiveWizard, QuietMode,
-        │   │                    # WorkspaceOutput, Spinner, ProgressBar,
-        │   │                    # Confirm, OutputView
-        │   ├── hooks/           # useWorkspaces (multi-stream), useRunner (single),
+        │   │                    # WorkingDirOutput, WorkingDirPane, StreamView,
+        │   │                    # Banner, Spinner, ProgressBar, Confirm, OutputView
+        │   ├── hooks/           # useWorkingDirs (multi-stream), useRunner (single),
         │   │                    # useTerminalSize (live resize detection)
-        │   └── commands/        # tools, providers (Phase 2A.5 keeps the layout)
+        │   ├── commands/        # tools, providers
+        │   ├── utils/           # colors, exclude-dirs
+        │   └── mock/            # mock-runner for dev/testing
         ├── scripts/
         │   ├── build-sea.sh     # macOS/Linux
         │   └── build-sea.ps1    # Windows
         ├── sea-config.json      # mainFormat:"module", useCodeCache:true
         ├── tsup.config.ts       # ESM, noExternal, inlineHcl2jsonWasm plugin
-        ├── test/                # ink-testing-library component tests (14 tests)
+        ├── test/                # ink-testing-library component tests (32 tests)
         └── tsconfig.json
 ```
 
@@ -203,15 +203,15 @@ Smart resolve always `GET`s `https://registry.terraform.io/.well-known/terraform
 
 ### 17. `.trunnerrc` lookup is scan-down only, not scan-up (Phase 2A.5)
 
-`trunner` recursively scans the **descendants** of cwd for `.trunnerrc`, stopping at the first one it finds in any subtree (a "project boundary"). It does **not** scan upward to find a parent `.trunnerrc`. If you `cd` into a subdirectory that has no `.trunnerrc` underneath it, trunner errors — `cd` to a project root or pass `--cwd <path>`. The scan always skips `.git` and `.terraform`; additional excludes (`.trunnerrc` `exclude` field or CLI `--exclude`) layer on top. Symlinks are not followed. See PLAN.md §4.8.
+`trunner` recursively scans the **descendants** of cwd for `.trunnerrc`, stopping at the first one it finds in any subtree (a "project boundary"). It does **not** scan upward to find a parent `.trunnerrc`. If you `cd` into a subdirectory that has no `.trunnerrc` underneath it, trunner errors — `cd` to a project root or pass `--cwd <path>`. The scan always skips `.git` and `.terraform`; additional excludes (`.trunnerrc` `exclude` field or CLI `--exclude-working-dirs`) layer on top. Symlinks are not followed. See PLAN.md §4.8.
 
-### 18. Multi-workspace runs are concurrent, not pipelined (Phase 2A.5)
+### 18. Multi-working-directory runs are concurrent, not pipelined (Phase 2A.5)
 
-When N workspaces are discovered, trunner runs the user's command against each in parallel up to a worker-pool cap of `os.cpus().length` (overridable via `.trunnerrc` `concurrency` or CLI `--concurrency`). Output streams are multiplexed through a single `AsyncIterable<WorkspaceEvent>`; the CLI's `useWorkspaces` hook routes each event to the right workspace's slot in the `ExecutionView`. A failed workspace does **not** abort the others — all run to completion, the final summary lists per-workspace exit codes, and the overall process exit code is `0` iff all succeeded. See PLAN.md §4.9.
+When N working directories are discovered, trunner runs the user's command against each in parallel up to a worker-pool cap of `os.cpus().length` (overridable via `.trunnerrc` `concurrency` or CLI `--concurrency`). Output streams are multiplexed through a single `AsyncIterable<WorkingDirEvent>`; the CLI's `useWorkingDirs` hook routes each event to the right working directory's slot in the `ExecutionView`. A failed working directory does **not** abort the others — all run to completion, the final summary lists per-working-directory exit codes, and the overall process exit code is `0` iff all succeeded. See PLAN.md §4.9.
 
 ### 19. `trunner tools` and `trunner providers` are the management commands (Phase 2A.5)
 
-The old `trunner tool list` and `trunner provider list` shapes are renamed to **plural** to free the singular nouns for use as workspace `tool` values. `trunner tools install terraform 1.6.6`, `trunner providers list`, `trunner providers install hashicorp/aws`. The single-verb form `trunner plan` never collides with these because of the strict noun-verb separation. See PLAN.md §5.1.
+The old `trunner tool list` and `trunner provider list` shapes are renamed to **plural** to free the singular nouns for use as working directory `tool` values. `trunner tools install terraform 1.6.6`, `trunner providers list`, `trunner providers install hashicorp/aws`. The single-verb form `trunner plan` never collides with these because of the strict noun-verb separation. See PLAN.md §5.1.
 
 ## Test command order for a clean PR
 
@@ -223,7 +223,7 @@ pnpm install && pnpm rebuild esbuild \
   && pnpm -r test
 ```
 
-Typecheck must be clean; both packages must build; the full vitest run (53 SDK unit + 1 SDK integration + 14 CLI tests) must pass. After Phase 2A.5 + 2B land, the SDK unit count will be ~67 (workspace discovery + runner + solver + walker + registry) and SDK integration will be 2/2 (smart-resolve on a 3-workspace fixture). Add `pnpm -F @trunner/cli build:sea:macos` to verify the SEA pipeline locally before pushing.
+Typecheck must be clean; both packages must build; the full vitest run (91 SDK unit + 1 SDK integration + 32 CLI tests) must pass. After Phase 2A.5 + 2B land, the SDK unit count will be ~67 (workspace discovery + runner + solver + walker + registry) and SDK integration will be 2/2 (smart-resolve on a 3-workspace fixture). Add `pnpm -F @trunner/cli build:sea:macos` to verify the SEA pipeline locally before pushing.
 
 ## Adding a new `Tool` (OpenTofu / …)
 
@@ -241,13 +241,15 @@ See `packages/sdk/src/tools/terraform/` for the reference implementation.
 
 ## Adding a new `.trunnerrc` field (Phase 2A.5)
 
-Schema lives in `packages/sdk/src/workspace/trunner-rc.ts` as a `zod`-style validator (hand-rolled, no runtime zod dep) plus a `parseRc(path)` that uses `smol-toml` to read the file. To add a field:
+Schema lives in `packages/sdk/src/working-dir/trunner-rc.ts` as a `zod`-style validator (hand-rolled, no runtime zod dep) plus a `parseRc(path)` that uses `smol-toml` to read the file. To add a field:
 
 1. Add the field to the `TrunnerRc` interface and the parse function's allow-list in `trunner-rc.ts`.
-2. If the field affects scanning (like `exclude`): thread it into `workspace/discover.ts` via the discovered `Workspace.config`.
-3. If the field affects execution (like `concurrency`): thread it into `workspace/runner.ts`'s `runWorkspaces` options.
-4. Add a unit test for both happy path and an invalid value (e.g. `concurrency = -1`).
+2. If the field affects scanning: thread it into `working-dir/discover.ts` via the discovered `WorkingDir.config`.
+3. If the field affects execution: thread it into `working-dir/runner.ts`'s `runWorkingDirs` options.
+4. Add a unit test for both happy path and an invalid value.
 5. If the field is mirrored in a CLI flag, add it to the meow config in `trunner.tsx` and document it in PLAN.md §5.1.
+
+> **Note**: CLI-only flags (`command`, `concurrency`, `--exclude-working-dirs`) are not `.trunnerrc` fields. They are passed via command line only.
 
 ## References
 

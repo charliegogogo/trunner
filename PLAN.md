@@ -153,7 +153,12 @@ packages/sdk/src/
 │   │   ├── provider.ts
 │   │   ├── commands.ts               # init/plan/apply/destroy/validate/output/fmt
 │   │   └── release-source.ts         # releases.hashicorp.com
-│   └── opentofu/                     # Placeholder (README + .gitkeep)
+│   └── opentofu/                     # Full implementation (mirrors terraform/)
+│       ├── index.ts
+│       ├── binary.ts
+│       ├── provider.ts
+│       ├── commands.ts
+│       └── release-source.ts
 ├── registry/
 │   └── tool-registry.ts              # register('terraform', () => new TerraformTool())
 ├── runner/
@@ -163,12 +168,8 @@ packages/sdk/src/
 ├── installer/
 │   ├── downloader.ts                 # node:fetch + retries
 │   ├── checksum.ts                   # SHA256
-│   ├── extractor.ts                  # zip / tar.gz per platform
-│   ├── version-solver.ts             # Pure: solve version candidates against constraints
-│   ├── constraint-set.ts             # Data structure wrapping the `semver` package
-│   ├── hcl-walker.ts                 # Recursive walk of .terraform/modules/ + project root
-│   └── provider-registry.ts          # Remote Service Discovery + Registry API client
-├── workspace/
+│   └── extractor.ts                  # zip / tar.gz per platform
+├── working-dir/
 │   ├── trunner-rc.ts                 # .trunnerrc schema + parser (smol-toml)
 │   ├── discover.ts                   # Recursive scan-down + project-boundary logic
 │   └── runner.ts                     # Parallel execution with concurrency control + stream multiplexing
@@ -184,16 +185,17 @@ packages/sdk/src/
 ### 4.3 Streaming API (EventEmitter)
 
 ```ts
-// runner/stream.ts
+// types/events.ts
 export interface RunnerEventMap {
   stdout: (chunk: string) => void;
   stderr: (chunk: string) => void;
   progress: (info: ProgressInfo) => void;
-  prompt:  (q: PromptRequest, answer: (v: string) => void) => void;
+  prompt:  (q: PromptRequest, answer: PromptAnswer) => void;
   exit:    (code: number | null, signal: NodeJS.Signals | null) => void;
 }
 
-export interface Runner {
+// runner/stream.ts
+export class RunnerStream extends EventEmitter {
   on<K extends keyof RunnerEventMap>(e: K, l: RunnerEventMap[K]): this;
   off<K extends keyof RunnerEventMap>(e: K, l: RunnerEventMap[K]): this;
   cancel(signal?: AbortSignal): Promise<void>;
@@ -285,10 +287,29 @@ provider_installation {
 ```ts
 // src/index.ts
 export { createRunner } from './runner/executor';
-export { ToolRegistry, registerBuiltinTools } from './registry/tool-registry';
+export { RunnerStream } from './runner/stream';
+export { parsePlanAndApplyOutput } from './runner/parser';
+
+export { ToolRegistry, getDefaultRegistry, createDefaultRegistry, registerBuiltinTools } from './registry/tool-registry';
+
 export { TerraformTool } from './tools/terraform';
+export { OpenTofuTool } from './tools/opentofu';
+
+export { BaseTool } from './tools/base/base-tool';
+export { BaseBinaryManager } from './tools/base/base-binary-manager';
+export { BaseProviderManager } from './tools/base/base-provider-manager';
+
+export { ConfigStore } from './env/config';
+export { getPaths, ensurePaths, pathExists } from './env/paths';
+
+export { parseRc, rcPathFor, RcParseError } from './working-dir/trunner-rc';
+export { discoverWorkingDirs, ALWAYS_EXCLUDE } from './working-dir/discover';
+export { runWorkingDirs } from './working-dir/runner';
+
 export type {
   Tool, CommandSpec, RunnerEventMap, ProgressInfo, VersionInfo,
+  WorkingDir, WorkingDirEvent, RunSummary, RunWorkingDirsOptions,
+  TrunnerRc, DiscoverOptions, PlatformInfo, ResolvedManifest,
 } from './types';
 ```
 
@@ -302,9 +323,9 @@ export type {
 
 ---
 
-### 4.8 Workspace Discovery (`workspace/discover.ts`)
+### 4.8 Working Directory Discovery (`working-dir/discover.ts`)
 
-A **workspace** is a directory containing a `.trunnerrc` file. `trunner <command>` discovers all workspaces under the current working directory and runs `<command>` in each, in parallel. This is the foundation of monorepo orchestration.
+A **working directory** is a directory containing a `.trunnerrc` file. `trunner <command>` discovers all working directories under the current working directory and runs `<command>` in each, in parallel. This is the foundation of monorepo orchestration.
 
 #### 4.8.1 `.trunnerrc` Schema (TOML)
 
@@ -313,18 +334,17 @@ A **workspace** is a directory containing a `.trunnerrc` file. `trunner <command
 tool = "terraform"            # or "opentofu"
 
 # optional
-command    = "plan"           # default command for interactive mode (plan/apply/destroy/init/validate)
 version    = "~> 1.6"         # tool binary version constraint (consumed by Phase 2B's solver)
-concurrency = 8               # override os.cpus().length for this workspace's run slot
-exclude    = ["vendor", "build"]  # extra dirs to skip during recursive scan (see §4.8.2)
 ```
 
 `smol-toml` parses the file. Unknown keys produce a warning, not an error (forward-compat).
 
+> **Note**: `command`, `concurrency`, and `--exclude-working-dirs` are CLI-only flags (§5.1), not `.trunnerrc` fields. `command` specifies which operation to run; `concurrency` controls parallel execution across all working directories; `--exclude-working-dirs` filters specific working directories at runtime.
+
 #### 4.8.2 Recursive Scan Algorithm
 
 ```
-discoverWorkspaces(cwd, opts = {}):
+discoverWorkingDirs(cwd, opts = {}):
   results = []
   walk(cwd, opts)
   return results
@@ -339,7 +359,7 @@ walk(dir, opts):
 ```
 
 - `ALWAYS_EXCLUDE = { '.git', '.terraform' }` — always, no override.
-- `opts.exclude` is the union of (CLI `--exclude` flags) ∪ (each `.trunnerrc`'s `exclude` field found in ancestors of cwd) — but we do NOT apply a workspace's own `exclude` to itself; we apply it when discovering siblings of that workspace. (Concretely: `exclude` affects the scan starting at the directory containing that `.trunnerrc`, not the workspace itself.)
+- `opts.exclude` is the union of (CLI `--exclude-working-dirs` flags) ∪ (each `.trunnerrc`'s `exclude` field found in ancestors of cwd) — but we do NOT apply a working directory's own `exclude` to itself; we apply it when discovering siblings of that working directory. (Concretely: `exclude` affects the scan starting at the directory containing that `.trunnerrc`, not the working directory itself.)
 - Symlinks are NOT followed (avoid infinite loops in vendored deps).
 - Permission errors during scan are logged and skipped, not fatal.
 
@@ -349,41 +369,41 @@ walk(dir, opts):
 - If the user is in `monorepo/services/api/src/` (no `.trunnerrc` in `src/...`), trunner errors: `no .trunnerrc found under <cwd>; cd to a project root or use --cwd <path>`.
 - The user can override cwd with `--cwd <path>` (resolves a different starting point for the scan). The scan still goes down from `--cwd`, not up.
 
-### 4.9 Multi-Project Execution (`workspace/runner.ts`)
+### 4.9 Multi-Project Execution (`working-dir/runner.ts`)
 
 ```ts
-// workspace/runner.ts
-export interface WorkspaceEventMap {
-  started:    (ws: Workspace) => void;
-  progress:   (ws: Workspace, info: ProgressInfo) => void;
-  stdout:     (ws: Workspace, chunk: string) => void;
-  stderr:     (ws: Workspace, chunk: string) => void;
-  exited:     (ws: Workspace, code: number | null, signal: NodeJS.Signals | null) => void;
+// working-dir/runner.ts
+export interface WorkingDirEventMap {
+  started:    (wd: WorkingDir) => void;
+  progress:   (wd: WorkingDir, info: ProgressInfo) => void;
+  stdout:     (wd: WorkingDir, chunk: string) => void;
+  stderr:     (wd: WorkingDir, chunk: string) => void;
+  exited:     (wd: WorkingDir, code: number | null, signal: NodeJS.Signals | null) => void;
   done:       (summary: RunSummary) => void;
 }
 
-export function runWorkspaces(
-  workspaces: Workspace[],
+export function runWorkingDirs(
+  workingDirs: WorkingDir[],
   command: string,
   args: string[],
   opts: { concurrency?: number; toolVersionRef?: string; toolOverride?: string }
-): AsyncIterable<WorkspaceEvent>;
+): AsyncIterable<WorkingDirEvent>;
 ```
 
 #### 4.9.1 Concurrency Model
 
-- Default: `os.cpus().length`. Each workspace's `.trunnerrc` `concurrency` field overrides locally; CLI `--concurrency <n>` overrides globally; global wins.
-- A simple worker-pool: N concurrent workers pull workspaces from a FIFO queue. A worker runs the full pipeline (`resolveAll` → spawn tool → stream output → exit) for one workspace, then picks the next.
-- Output streams are buffered per workspace; the consumer of the `AsyncIterable` is responsible for routing each event to the right pane in the UI (see §5.3).
+- Default: `os.cpus().length`. Each working directory's `.trunnerrc` `concurrency` field overrides locally; CLI `--concurrency <n>` overrides globally; global wins.
+- A simple worker-pool: N concurrent workers pull working directories from a FIFO queue. A worker runs the full pipeline (`resolveAll` → spawn tool → stream output → exit) for one working directory, then picks the next.
+- Output streams are buffered per working directory; the consumer of the `AsyncIterable` is responsible for routing each event to the right pane in the UI (see §5.3).
 
-#### 4.9.2 Per-Workspace Pipeline
+#### 4.9.2 Per-Working Directory Pipeline
 
-For each workspace picked off the queue:
+For each working directory picked off the queue:
 
-1. `tool.resolveAll({ projectDir: ws.dir, toolVersionRef, platform })` — Phase 2B's smart resolver (§4.5).
-2. Set `cwd = ws.dir` and `TF_CLI_CONFIG_FILE` (for the provider mirror) when spawning the tool binary.
-3. Stream stdout/stderr through the `WorkspaceEvent` channel tagged with the workspace.
-4. On exit, mark the workspace as `done` with the exit code; the next worker picks up the next workspace.
+1. `tool.resolveAll({ projectDir: wd.dir, toolVersionRef, platform })` — Phase 2B's smart resolver (§4.5).
+2. Set `cwd = wd.dir` and `TF_CLI_CONFIG_FILE` (for the provider mirror) when spawning the tool binary.
+3. Stream stdout/stderr through the `WorkingDirEvent` channel tagged with the working directory.
+4. On exit, mark the working directory as `done` with the exit code; the next worker picks up the next working directory.
 
 #### 4.9.3 UI Model
 
@@ -393,7 +413,7 @@ For each workspace picked off the queue:
 
 **Post-execution**: `QuietMode` shows per-working-directory results with status codes. Press Esc to exit. Results printed to stdout after Ink exits using ANSI color codes (green=success, red=failure).
 
-A failed workspace does **not** abort the rest — all workspaces run to completion, the summary at the end reports per-workspace exit codes, and the overall process exit code is `0` if all succeeded, `1` otherwise.
+A failed working directory does **not** abort the rest — all working directories run to completion, the summary at the end reports per-working-directory exit codes, and the overall process exit code is `0` if all succeeded, `1` otherwise.
 
 ---
 
@@ -425,8 +445,8 @@ trunner --version
 - After completion, press Esc to exit — results are printed to stdout with colorized table output
 
 **Exit behavior**:
-- By default, trunner stays alive after command completion (press Esc to exit)
-- Set `TR_KEEP_ALIVE=0` to auto-exit after completion
+- Non-interactive mode: auto-exits after command completion (no `TR_KEEP_ALIVE`).
+- Interactive mode: press Esc to exit after command completion.
 - Ctrl+C forces immediate exit at any time
 
 If `trunner <command>` is run with no `.trunnerrc` found under cwd (and no `-t` / `--cwd` set), trunner errors with a structured message:
@@ -440,13 +460,13 @@ hint: cd to a project root, create a .trunnerrc, or pass --cwd <path> and -t <to
 
 | Flag | Meaning | Default |
 | --- | --- | --- |
-| `-t, --tool <name>` | Override the workspace's `.trunnerrc` `tool` field for this invocation only. | `.trunnerrc`'s `tool` |
-| `--cwd <path>` | Start the workspace scan from `<path>` instead of the actual cwd. | `process.cwd()` |
+| `-t, --tool <name>` | Override the working directory's `.trunnerrc` `tool` field for this invocation only. | `.trunnerrc`'s `tool` |
+| `--cwd <path>` | Start the working directory scan from `<path>` instead of the actual cwd. | `process.cwd()` |
 | `--tool-version <semver>` | Pin the tool binary version (e.g. `1.6.6`, `~> 1.6`). Overrides `.trunnerrc`'s `version` and the project's HCL `required_version`. | `auto` |
 | `--include-prerelease` | Allow pre-release versions (`1.0.0-rc1`) in the solver candidate list. | off |
 | `--mirror <url>` | Override the default terraform + provider mirror. | unset |
 | `--concurrency <n>` | Max working directories running in parallel. | `os.cpus().length` |
-| `--exclude <dir>` | Add `<dir>` to the scan's exclude set. Repeatable. | empty |
+| `--exclude-working-dirs <dirs>` | Comma-separated relative paths of working dirs to exclude (e.g. "dir1,dir2/subdir"). | empty |
 | `--json` | Emit a single JSON line per working directory event (CI-friendly; no TUI). | off |
 | `--quiet` | Suppress per-working-directory carousel view; emit only the final summary. | off |
 | `--no-alt-screen` | Skip the alternate screen buffer (scrollback stays visible; risky in reflow terminals). | off |
@@ -459,28 +479,38 @@ Note: `--version` is reserved for the trunner version (`trunner --version` → `
 packages/cli/src/
 ├── trunner.tsx                      # entry (single-verb parsing, global flags)
 ├── app.tsx                          # Root <App/>: interactive wizard or command execution
+├── types.ts                         # CliFlags, CliSubcommand
 ├── ui/
 │   ├── ExecutionView.tsx            # Carousel view with tabs for each working directory
 │   ├── QuietMode.tsx                # Summary view after command completion
 │   ├── InteractiveWizard.tsx        # Step-by-step wizard for interactive mode
-│   ├── WorkspaceOutput.tsx          # Raw ANSI output display for a single workspace
-│   ├── StatusBar.tsx                # (legacy) top-level card list
-│   ├── WorkspacePane.tsx            # (legacy) detail view for focused workspace
+│   ├── WorkingDirOutput.tsx         # Raw ANSI output display for a single working directory
+│   ├── WorkingDirPane.tsx           # Detail view for focused working directory
+│   ├── StreamView.tsx               # Non-interactive streaming output
+│   ├── Banner.tsx                   # Solid block Unicode font banner
 │   ├── Spinner.tsx
 │   ├── ProgressBar.tsx
-│   ├── Confirm.tsx                  # Drives Runner.prompt (forwarded to focused workspace)
+│   ├── Confirm.tsx                  # Drives Runner.prompt (forwarded to focused working directory)
 │   └── OutputView.tsx               # ANSI-colored, live
-├── ipc/                             # (Phase 3A) typed wrapper for IPC push events
-└── hooks/
-    ├── useWorkspaces.ts             # AsyncIterable<WorkspaceEvent> → React state
-    ├── useTerminalSize.ts           # Terminal resize detection
-    └── useRunner.ts                 # Single-workspace runner (used by ipc/ in Phase 3A)
+├── hooks/
+│   ├── useWorkingDirs.ts            # AsyncIterable<WorkingDirEvent> → React state
+│   ├── useTerminalSize.ts           # Terminal resize detection
+│   └── useRunner.ts                 # Single working directory runner (used by ipc/ in Phase 3A)
+├── commands/
+│   ├── tools.tsx                    # trunner tools subcommand
+│   └── providers.tsx                # trunner providers subcommand
+├── utils/
+│   ├── colors.ts                    # getWorkingDirColor, getWorkingDirAnsiColor, getWorkingDirInkColor
+│   └── exclude-dirs.ts              # parseExcludeWorkingDirs, filterExcludedWorkingDirs
+├── mock/
+│   └── mock-runner.ts               # Mock runner for development/testing
+└── ipc/                             # (Phase 3A) typed wrapper for IPC push events
 ```
 
 ### 5.3 UI Behaviors
 
 **Interactive mode** (`trunner` with no arguments):
-- `InteractiveWizard`: Step-by-step wizard with purple borders. Navigate with ↑/↓ keys, select with Enter. Steps: select command (plan/apply/destroy/init/validate) → select tool (terraform/opentofu). Reads defaults from `.trunnerrc` if present. No j/k navigation — only arrow keys.
+- `InteractiveWizard`: Step-by-step wizard with purple borders. Navigate with ↑/↓ keys, select with Enter. Steps: select tool (terraform/opentofu) → select command (plan/apply/destroy) → select working directories to exclude (Space to toggle, Enter to confirm). Reads defaults from `.trunnerrc` if present. No j/k navigation — only arrow keys.
 
 **Command execution** (`trunner <command>`):
 - `ExecutionView`: Carousel view with tabs for each discovered working directory. Purple borders. Tab switching with ←/→ keys. Output scrolling with ↑/↓ keys. Shows all working directories simultaneously with their status (running ✓/✗/⏳).
@@ -489,18 +519,18 @@ packages/cli/src/
 - `QuietMode`: Summary view after command completion. Shows per-working-directory results with status codes. Press Esc to exit.
 
 **Output rendering**:
-- `WorkspaceOutput`: Renders raw ANSI output for a single working directory. Used inside `ExecutionView` tabs and `QuietMode` cards.
+- `WorkingDirOutput`: Renders raw ANSI output for a single working directory. Used inside `ExecutionView` tabs and `QuietMode` cards.
 
-- `useWorkspaces`: subscribes to the `AsyncIterable<WorkspaceEvent>` from `workspace.runner.runWorkspaces` and routes each event to the right workspace's state slot in the React tree.
+- `useWorkingDirs`: subscribes to the `AsyncIterable<WorkingDirEvent>` from `working-dir.runner.runWorkingDirs` and routes each event to the right working directory's state slot in the React tree.
 - `useTerminalSize`: Live terminal resize detection via `process.stdout.on('resize')`. Prevents layout corruption on terminal resize.
 
 **Exit behavior**:
-- By default, trunner stays alive after command completion (press Esc to exit).
-- Set `TR_KEEP_ALIVE=0` to auto-exit after completion.
+- Non-interactive mode: auto-exits after command completion (no `TR_KEEP_ALIVE`).
+- Interactive mode: press Esc to exit after command completion.
 - Ctrl+C forces immediate exit at any time.
 - Results are printed to stdout after Ink exits using ANSI color codes (green=success, red=failure).
 
-- Top-level error boundary surfaces structured errors and exit codes; on `trunner plan` failure of any workspace, the top-level exit code is `1` and the summary lists which workspace(s) failed.
+- Top-level error boundary surfaces structured errors and exit codes; on `trunner plan` failure of any working directory, the top-level exit code is `1` and the summary lists which working directory(s) failed.
 
 ### 5.4 Build & Packaging — Node.js SEA
 
@@ -700,18 +730,18 @@ Each phase ends with passing tests and a working demo.
 
 **Total estimate**: ~8.5h. SDK is the bulk (steps 1, 2, 4); CLI TUI (steps 5, 6) is the rest.
 
-- [ ] Step 1: `workspace/trunner-rc.ts` (schema + parser).
-- [ ] Step 2: `workspace/discover.ts` (scan algorithm + project boundary + excludes).
-- [ ] Step 3: CLI global flags (`-t`, `--cwd`, `--tool-version`, `--include-prerelease`, `--mirror`, `--concurrency`, `--exclude`, `--json`, `--quiet`).
-- [ ] Step 4: `workspace/runner.ts` (worker-pool + stream multiplexing).
-- [ ] Step 5: `ExecutionView` + `InteractiveWizard` + `useWorkspaces` TUI.
-- [ ] Step 6: component tests for multi-workspace routing.
-- [ ] Step 7: end-to-end smoke on a 3-workspace fixture.
-- [ ] Re-export `discoverWorkspaces`, `runWorkspaces`, `Workspace`, `WorkspaceEventMap` from `packages/sdk/src/index.ts`.
-- [ ] Deprecate the old `<tool> <command>` shape (remove `commands/<tool>/*.tsx` scaffolding; keep the file layout for later per-tool subcommand files in Phase 3A).
-- [ ] Re-verify `pnpm -r typecheck` and `pnpm -F @trunner/sdk build` are clean.
+- [x] Step 1: `working-dir/trunner-rc.ts` (schema + parser).
+- [x] Step 2: `working-dir/discover.ts` (scan algorithm + project boundary + excludes).
+- [x] Step 3: CLI global flags (`-t`, `--cwd`, `--tool-version`, `--include-prerelease`, `--mirror`, `--concurrency`, `--exclude-working-dirs`, `--json`, `--quiet`).
+- [x] Step 4: `working-dir/runner.ts` (worker-pool + stream multiplexing).
+- [x] Step 5: `ExecutionView` + `InteractiveWizard` + `useWorkingDirs` TUI.
+- [x] Step 6: component tests for multi-working-directory routing.
+- [x] Step 7: end-to-end smoke on a 3-working-directory fixture.
+- [x] Re-export `discoverWorkingDirs`, `runWorkingDirs`, `WorkingDir`, `WorkingDirEvent` from `packages/sdk/src/index.ts`.
+- [x] Deprecate the old `<tool> <command>` shape (remove `commands/<tool>/*.tsx` scaffolding; keep the file layout for later per-tool subcommand files in Phase 3A).
+- [x] Re-verify `pnpm -r typecheck` and `pnpm -F @trunner/sdk build` are clean.
 
-**Phase 2A.5 acceptance**: In a tmp monorepo with three `.trunnerrc` workspaces (`team-a/api` terraform 1.6, `team-b/web` terraform 1.5, `team-c/db` opentofu), running `trunner plan` discovers all three, runs them in parallel (carousel view shows `running` per workspace), and produces a final summary with per-working-directory results. `trunner plan -t opentofu` overrides every workspace's tool to opentofu. `trunner plan --concurrency 1` serializes. `trunner plan --exclude vendor` skips a `vendor/.trunnerrc` (fixture has it). The old `--mock terraform plan --auto-yes` shape is removed; the new shape is the only supported surface. `trunner` with no arguments shows interactive wizard to select command and tool.
+**Phase 2A.5 acceptance**: In a tmp monorepo with three `.trunnerrc` working directories (`team-a/api` terraform 1.6, `team-b/web` terraform 1.5, `team-c/db` opentofu), running `trunner plan` discovers all three, runs them in parallel (carousel view shows `running` per working directory), and produces a final summary with per-working-directory results. `trunner plan -t opentofu` overrides every working directory's tool to opentofu. `trunner plan --concurrency 1` serializes. `trunner plan --exclude-working-dirs "vendor"` skips a `vendor/.trunnerrc` (fixture has it). The old `--mock terraform plan --auto-yes` shape is removed; the new shape is the only supported surface. `trunner` with no arguments shows interactive wizard to select command and tool.
 
 ---
 

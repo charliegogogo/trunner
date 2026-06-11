@@ -85,14 +85,14 @@ describe('working-dir/discover', () => {
 
   it('reports non-fatal skips via onSkip callback', async () => {
     await mkWs('good', 'terraform');
-    await mkWs('bad', 'terraform', 'concurrency = -1'); // invalid concurrency → parse error
+    await mkWs('bad', 'invalid-tool'); // invalid tool → parse error
     const skips: Array<{ dir: string; reason: string }> = [];
     const ws = await discoverWorkingDirs(root, { onSkip: (s) => skips.push(s) });
     expect(ws).toHaveLength(1);
     expect(basename(ws[0]!.dir)).toBe('good');
     expect(skips).toHaveLength(1);
     expect(skips[0]!.dir).toBe(join(root, 'bad'));
-    expect(skips[0]!.reason).toMatch(/invalid value for 'concurrency'/);
+    expect(skips[0]!.reason).toMatch(/invalid value for 'tool'/);
   });
 
   it('reports unknown-key warnings via onWarning callback (forward-compat)', async () => {
