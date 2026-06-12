@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
+import { TabBar } from './TabBar.js';
 
 export interface ExecutionViewProps {
   workingDirs: WorkingDirDisplay[];
@@ -58,42 +59,22 @@ export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isCompl
     return lines.slice(startIdx, endIdx);
   }, [focused?.stdout, focused?.stderr, outputHeight, scrollOffset]);
 
+  const tabs = workingDirs.map((wd) => ({
+    label: shortDir(wd.dir),
+    icon: stateIcon(wd.state, wd.exitCode),
+  }));
+
   return (
     <Box flexDirection="column" width={width} height={height}>
       {/* Tab bar with purple border */}
-      <Box
-        flexDirection="row"
-        borderStyle="round"
-        borderColor="magenta"
-        paddingX={1}
+      <TabBar
+        tabs={tabs}
+        activeIndex={focusedIndex}
+        suffix={
+          <Text dimColor>{workingDirs.length} working director{workingDirs.length === 1 ? 'y' : 'ies'}</Text>
+        }
         width={width}
-        height={tabHeight}
-      >
-        <Text bold color="magenta">trunner</Text>
-        <Text dimColor> │ </Text>
-        {workingDirs.map((wd, i) => {
-          const isActive = i === focusedIndex;
-          const icon = stateIcon(wd.state, wd.exitCode);
-          const label = shortDir(wd.dir);
-          return (
-            <Text key={wd.dir}>
-              {i > 0 && <Text dimColor> │ </Text>}
-              {isActive ? (
-                <Text bold color="magenta">
-                  {' '}
-                  {icon} {label}{' '}
-                </Text>
-              ) : (
-                <Text dimColor>
-                  {icon} {label}
-                </Text>
-              )}
-            </Text>
-          );
-        })}
-        <Text dimColor> │ </Text>
-        <Text dimColor>{workingDirs.length} working director{workingDirs.length === 1 ? 'y' : 'ies'}</Text>
-      </Box>
+      />
 
       {/* Working directory output with purple border */}
       {focused && (

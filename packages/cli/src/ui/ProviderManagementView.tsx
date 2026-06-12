@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { BaseProviderManager, TerraformProviderManager, OpenTofuProviderManager, getPlatformInfo, type ProgressInfo } from '@trunner/sdk';
 import { Modal } from './Modal.js';
 import { DownloadProgress } from './DownloadProgress.js';
+import { TabBar } from './TabBar.js';
 
 export interface ProviderManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -190,36 +191,30 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
   // Calculate how many versions to show based on terminal height
   const maxVisibleVersions = Math.max(5, height - 12);
 
+  const tabs = [
+    { label: 'Installed Providers' },
+    { label: 'Install Provider' },
+  ];
+
   return (
-    <Box flexDirection="column" width={width} height={height} paddingX={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color="magenta">trrunner</Text>
-        <Text dimColor> │ </Text>
-        <Text bold>Provider Management</Text>
-        <Text dimColor> │ </Text>
-        <Text dimColor>{tool}</Text>
-      </Box>
+    <Box flexDirection="column" width={width} height={height}>
+      {/* Tab bar with purple border */}
+      <TabBar
+        tabs={tabs}
+        activeIndex={tab === 'installed' ? 0 : 1}
+        suffix={<Text dimColor>{tool}</Text>}
+        width={width}
+      />
 
-      {/* Tab bar */}
-      <Box marginBottom={1}>
-        <Text
-          bold={tab === 'installed'}
-          color={tab === 'installed' ? 'magenta' : undefined}
-        >
-          {tab === 'installed' ? '▸ ' : '  '}Installed Providers
-        </Text>
-        <Text>  </Text>
-        <Text
-          bold={tab === 'install'}
-          color={tab === 'install' ? 'magenta' : undefined}
-        >
-          {tab === 'install' ? '▸ ' : '  '}Install Provider
-        </Text>
-      </Box>
-
-      {/* Content */}
-      <Box flexGrow={1} flexDirection="column">
+      {/* Content with purple border */}
+      <Box
+        flexDirection="column"
+        borderStyle="single"
+        borderColor="magenta"
+        paddingX={1}
+        width={width}
+        flexGrow={1}
+      >
         {phase === 'loading' && (
           <Box marginTop={1}>
             <Text color="yellow">Loading installed providers...</Text>
@@ -326,26 +321,30 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
             />
           </Box>
         )}
-
-        {/* Installing / Uninstalling overlay */}
-        {(phase === 'installing' || phase === 'uninstalling') && (
-          <Box marginTop={1} flexDirection="column">
-            {phase === 'installing' ? (
-              <DownloadProgress
-                current={downloadProgress?.current ?? 0}
-                total={downloadProgress?.total ?? 0}
-                label={`Downloading provider...`}
-                width={width - 2}
-              />
-            ) : (
-              <Text color="yellow">Uninstalling...</Text>
-            )}
-          </Box>
-        )}
       </Box>
 
-      {/* Status bar */}
-      <Box marginTop={1} paddingTop={1}>
+      {/* Progress bar - fixed at bottom */}
+      {(phase === 'installing' || phase === 'uninstalling') && (
+        <Box paddingX={1} width={width}>
+          {phase === 'installing' ? (
+            <DownloadProgress
+              current={downloadProgress?.current ?? 0}
+              total={downloadProgress?.total ?? 0}
+              label="Downloading provider..."
+              width={width - 2}
+            />
+          ) : (
+            <Text color="yellow">Uninstalling...</Text>
+          )}
+        </Box>
+      )}
+
+      {/* Status bar without border */}
+      <Box
+        flexDirection="row"
+        paddingX={1}
+        width={width}
+      >
         <Text dimColor>
           ←/→ switch tabs │ ↑/↓ navigate │ Enter select │ Esc {phase === 'modal' ? 'cancel' : 'exit'}
           {(phase === 'installing' || phase === 'uninstalling') ? ' │ Processing...' : ''}

@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { BaseBinaryManager, TerraformBinaryManager, OpenTofuBinaryManager, type ProgressInfo } from '@trunner/sdk';
 import { Modal } from './Modal.js';
 import { DownloadProgress } from './DownloadProgress.js';
+import { TabBar } from './TabBar.js';
 
 export interface BinaryManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -122,21 +123,29 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
   }, [selectedVersion, versions]);
 
   // Calculate how many versions to show based on terminal height
-  const maxVisibleVersions = Math.max(5, height - 10);
+  const maxVisibleVersions = Math.max(5, height - 12);
+
+  const tabs = [{ label: 'Tool Binary Management' }];
 
   return (
-    <Box flexDirection="column" width={width} height={height} paddingX={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color="magenta">trunner</Text>
-        <Text dimColor> │ </Text>
-        <Text bold>Tool Binary Management</Text>
-        <Text dimColor> │ </Text>
-        <Text dimColor>{tool}</Text>
-      </Box>
+    <Box flexDirection="column" width={width} height={height}>
+      {/* Tab bar with purple border */}
+      <TabBar
+        tabs={tabs}
+        activeIndex={0}
+        suffix={<Text dimColor>{tool}</Text>}
+        width={width}
+      />
 
-      {/* Content */}
-      <Box flexGrow={1} flexDirection="column">
+      {/* Content with purple border */}
+      <Box
+        flexDirection="column"
+        borderStyle="single"
+        borderColor="magenta"
+        paddingX={1}
+        width={width}
+        flexGrow={1}
+      >
         {phase === 'loading' && (
           <Box marginTop={1}>
             <Text color="yellow">Fetching version information...</Text>
@@ -199,26 +208,30 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
             />
           </Box>
         )}
-
-        {/* Installing / Uninstalling overlay */}
-        {(phase === 'installing' || phase === 'uninstalling') && (
-          <Box marginTop={1} flexDirection="column">
-            {phase === 'installing' ? (
-              <DownloadProgress
-                current={downloadProgress?.current ?? 0}
-                total={downloadProgress?.total ?? 0}
-                label={`Downloading ${tool}...`}
-                width={width - 2}
-              />
-            ) : (
-              <Text color="yellow">Uninstalling...</Text>
-            )}
-          </Box>
-        )}
       </Box>
 
-      {/* Status bar */}
-      <Box marginTop={1} paddingTop={1}>
+      {/* Progress bar - fixed at bottom */}
+      {(phase === 'installing' || phase === 'uninstalling') && (
+        <Box paddingX={1} width={width}>
+          {phase === 'installing' ? (
+            <DownloadProgress
+              current={downloadProgress?.current ?? 0}
+              total={downloadProgress?.total ?? 0}
+              label={`Downloading ${tool}...`}
+              width={width - 2}
+            />
+          ) : (
+            <Text color="yellow">Uninstalling...</Text>
+          )}
+        </Box>
+      )}
+
+      {/* Status bar without border */}
+      <Box
+        flexDirection="row"
+        paddingX={1}
+        width={width}
+      >
         <Text dimColor>
           ↑/↓ navigate │ Enter select │ Esc {phase === 'modal' ? 'cancel' : 'exit'}
           {(phase === 'installing' || phase === 'uninstalling') ? ' │ Processing...' : ''}
