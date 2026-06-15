@@ -4,6 +4,7 @@ import { BaseBinaryManager, TerraformBinaryManager, OpenTofuBinaryManager, type 
 import { Modal } from './Modal.js';
 import { DownloadProgress } from './DownloadProgress.js';
 import { TabBar } from './TabBar.js';
+import { ScrollableList } from './ScrollableList.js';
 
 export interface BinaryManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -158,9 +159,11 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
               <Text bold>Available versions ({versions.length}):</Text>
             </Box>
             <Box flexDirection="column">
-              {versions.slice(0, maxVisibleVersions).map((v, i) => {
-                const isActive = i === selectedIndex;
-                return (
+              <ScrollableList
+                items={versions}
+                selectedIndex={selectedIndex}
+                maxVisible={maxVisibleVersions}
+                renderItem={(v, _index, isActive) => (
                   <Text key={v.version}>
                     {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
                     {isActive ? (
@@ -172,11 +175,8 @@ export function BinaryManagementView({ tool, width, height, onExit }: BinaryMana
                       <Text color="green"> Installed</Text>
                     )}
                   </Text>
-                );
-              })}
-              {versions.length > maxVisibleVersions && (
-                <Text dimColor>  ... and {versions.length - maxVisibleVersions} more versions</Text>
-              )}
+                )}
+              />
             </Box>
           </Box>
         )}

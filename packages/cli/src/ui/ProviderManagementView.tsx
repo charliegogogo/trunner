@@ -4,6 +4,7 @@ import { BaseProviderManager, TerraformProviderManager, OpenTofuProviderManager,
 import { Modal } from './Modal.js';
 import { DownloadProgress } from './DownloadProgress.js';
 import { TabBar } from './TabBar.js';
+import { ScrollableList } from './ScrollableList.js';
 
 export interface ProviderManagementViewProps {
   tool: 'terraform' | 'opentofu';
@@ -230,16 +231,18 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
             {installedProviders.length === 0 ? (
               <Text dimColor>No providers installed</Text>
             ) : (
-              installedProviders.map((p, i) => {
-                const isActive = i === selectedIndex;
-                return (
+              <ScrollableList
+                items={installedProviders}
+                selectedIndex={selectedIndex}
+                maxVisible={maxVisibleVersions}
+                renderItem={(p, _index, isActive) => (
                   <Text key={`${p.source}-${p.version}`}>
                     {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
                     <Text color="cyan">{p.source}</Text>
                     <Text dimColor> @ {p.version}</Text>
                   </Text>
-                );
-              })
+                )}
+              />
             )}
           </Box>
         )}
@@ -270,9 +273,11 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
             {availableVersions.length === 0 ? (
               <Text dimColor>No versions found</Text>
             ) : (
-              availableVersions.slice(0, maxVisibleVersions).map((v, i) => {
-                const isActive = i === versionSelectedIndex;
-                return (
+              <ScrollableList
+                items={availableVersions}
+                selectedIndex={versionSelectedIndex}
+                maxVisible={maxVisibleVersions}
+                renderItem={(v, _index, isActive) => (
                   <Text key={v.version}>
                     {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
                     {isActive ? (
@@ -284,11 +289,8 @@ export function ProviderManagementView({ tool, width, height, onExit }: Provider
                       <Text color="green"> Installed</Text>
                     )}
                   </Text>
-                );
-              })
-            )}
-            {availableVersions.length > maxVisibleVersions && (
-              <Text dimColor>  ... and {availableVersions.length - maxVisibleVersions} more versions</Text>
+                )}
+              />
             )}
             <Box marginTop={1}>
               <Text dimColor>Press <Text bold>Enter</Text> to install, <Text bold>Esc</Text> to go back</Text>

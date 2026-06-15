@@ -2,7 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { TrunnerRc, WorkingDir } from '@trunner/sdk';
 import { Banner } from './Banner.js';
+import { ScrollableList } from './ScrollableList.js';
 import { getRelativePath } from '../utils/exclude-dirs.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 export interface InteractiveWizardResult {
   command: string;
@@ -42,6 +44,7 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
   const [toolIndex, setToolIndex] = useState<number>(0);
   const [excludeIndices, setExcludeIndices] = useState<Set<number>>(new Set());
   const [excludeFocusIndex, setExcludeFocusIndex] = useState<number>(0);
+  const { height } = useTerminalSize();
 
   const selectedOption = ALL_OPTIONS[selectedIndex]!;
 
@@ -234,23 +237,32 @@ export function InteractiveWizard({ onComplete, defaultRc, detectedTool, working
             <Text dimColor>Press <Text bold>Space</Text> to toggle, <Text bold>Enter</Text> to confirm, <Text bold>↑/↓</Text> to navigate</Text>
           </Box>
           <Box marginTop={1} flexDirection="column">
-            {workingDirs.map((wd, i) => {
-              const isActive = i === excludeFocusIndex;
-              const isSelected = excludeIndices.has(i);
-              const relPath = getRelativePath(wd.dir, cwd);
+            {(() => {
+              const maxVisible = Math.max(5, height - 10);
               return (
-                <Text key={wd.dir}>
-                  {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
-                  <Text color={isSelected ? 'green' : undefined}>
-                    {isSelected ? '[✓]' : '[ ]'}
-                  </Text>
-                  <Text> {relPath}</Text>
-                  {isActive && (
-                    <Text dimColor> ({wd.config.tool})</Text>
-                  )}
-                </Text>
+                <ScrollableList
+                  items={workingDirs}
+                  selectedIndex={excludeFocusIndex}
+                  maxVisible={maxVisible}
+                  renderItem={(wd, index, isActive) => {
+                    const isSelected = excludeIndices.has(index);
+                    const relPath = getRelativePath(wd.dir, cwd);
+                    return (
+                      <Text key={wd.dir}>
+                        {isActive ? <Text color="green">▶ </Text> : <Text>  </Text>}
+                        <Text color={isSelected ? 'green' : undefined}>
+                          {isSelected ? '[✓]' : '[ ]'}
+                        </Text>
+                        <Text> {relPath}</Text>
+                        {isActive && (
+                          <Text dimColor> ({wd.config.tool})</Text>
+                        )}
+                      </Text>
+                    );
+                  }}
+                />
               );
-            })}
+            })()}
           </Box>
           <Box marginTop={1}>
             <Text dimColor>
