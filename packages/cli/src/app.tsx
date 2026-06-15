@@ -293,6 +293,7 @@ function InteractiveExecution({ command, commandArgs, flags, onExit }: Interacti
       isComplete={state.phase === 'done'}
       width={termWidth}
       height={termHeight}
+      cwd={flags.cwd}
     />
   );
 }

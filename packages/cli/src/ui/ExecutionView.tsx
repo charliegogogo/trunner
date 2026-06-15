@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
+import { relative, resolve as resolvePath } from 'node:path';
 import type { WorkingDirDisplay } from '../hooks/useWorkingDirs.js';
 import { TabBar } from './TabBar.js';
 
@@ -10,6 +11,8 @@ export interface ExecutionViewProps {
   isComplete: boolean;
   width: number;
   height: number;
+  /** Current working directory used to compute relative paths for display */
+  cwd: string;
 }
 
 function shortDir(dir: string): string {
@@ -18,6 +21,24 @@ function shortDir(dir: string): string {
     return `~${dir.slice(home.length)}`;
   }
   return dir;
+}
+
+/**
+ * Get relative path from cwd, normalized to forward slashes for cross-platform display.
+ */
+function relativeDir(cwd: string, dir: string): string {
+  const cwdAbs = resolvePath(cwd);
+  const dirAbs = resolvePath(dir);
+  const rel = relative(cwdAbs, dirAbs);
+  // Normalize to forward slashes for consistent display across platforms
+  return rel.split('\\').join('/');
+}
+
+/**
+ * Get absolute path in the OS's native format.
+ */
+function absoluteDir(dir: string): string {
+  return resolvePath(dir);
 }
 
 function stateIcon(state: WorkingDirDisplay['state'], exitCode: number | null): string {
@@ -44,7 +65,7 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, '');
 }
 
-export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isComplete, width, height }: ExecutionViewProps): React.ReactElement {
+export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isComplete, width, height, cwd }: ExecutionViewProps): React.ReactElement {
   const tabHeight = 3;
   const outputHeight = height - tabHeight - 3;
   const focused = workingDirs[focusedIndex];
@@ -60,7 +81,7 @@ export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isCompl
   }, [focused?.stdout, focused?.stderr, outputHeight, scrollOffset]);
 
   const tabs = workingDirs.map((wd) => ({
-    label: shortDir(wd.dir),
+    label: relativeDir(cwd, wd.dir),
     icon: stateIcon(wd.state, wd.exitCode),
   }));
 
@@ -87,7 +108,7 @@ export function ExecutionView({ workingDirs, focusedIndex, scrollOffset, isCompl
           flexGrow={1}
         >
           <Box marginBottom={1}>
-            <Text bold color="magenta">{shortDir(focused.dir)}</Text>
+            <Text bold color="magenta">{absoluteDir(focused.dir)}</Text>
             <Text dimColor> │ </Text>
             <Text color={stateColor(focused.state, focused.exitCode)}>
               {focused.state}
